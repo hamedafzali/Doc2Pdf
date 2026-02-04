@@ -77,21 +77,39 @@ python main.py --list-formats
 - `/start` - Start bot and see welcome message
 - `/help` - Show help message
 - `/convert` - Convert received images to PDF
+- `/compress_high` - Set high quality compression (95%) - Best quality
+- `/compress_medium` - Set medium quality compression (85%) - Default
+- `/compress_low` - Set low quality compression (70%) - Smallest file
 - `/clear` - Clear all pending images
 
 #### Bot Usage
 
 1. Send one or more images to the bot
-2. Use `/convert` when ready
-3. Download the PDF file
+2. (Optional) Set compression level with `/compress_high`, `/compress_medium`, or `/compress_low`
+3. Use `/convert` when ready
+4. Download the PDF file with detailed size information
+
+#### Compression Options
+
+- **High Quality (95%)**: Best image quality, larger file size
+- **Medium Quality (85%)**: Good balance of quality and size (default)
+- **Low Quality (70%)**: Smallest file size, lower image quality
+
+#### File Size Information
+
+The bot provides detailed file size information:
+
+- Original image size(s)
+- Final PDF size
+- Compression ratio when applicable
+- Image format and dimensions (single images)
+- Number of images (multiple images)
 
 ## Supported Image Formats
 
 - JPG/JPEG
 - PNG
 - BMP
-- TIFF
-- GIF
 - WebP
 
 ## Features
@@ -102,6 +120,8 @@ python main.py --list-formats
 - Batch directory processing
 - CLI interface
 - **Telegram bot integration**
+- **PDF compression options** (High/Medium/Low quality)
+- **Detailed file size information**
 - Automatic file cleanup
 - User-friendly interface
 

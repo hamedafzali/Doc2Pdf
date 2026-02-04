@@ -31,6 +31,7 @@ class ImageToPdfBot:
         self.token = token
         self.converter = ImageToPdfConverter()
         self.user_temp_files = {}  # Track temporary files per user
+        self.user_compression_settings = {}  # Track compression settings per user
         self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
         self.debug_dir = 'debug_output'
         
@@ -48,18 +49,23 @@ Welcome! I can convert your images to PDF format.
 **Features:**
 • Convert single images to PDF
 • Combine multiple images into one PDF
+• **NEW:** PDF compression options
 • Supports: JPG, PNG, BMP, TIFF, GIF, WebP
 
 **How to use:**
 1. Send me one or more images
-2. Use /convert when ready
-3. I'll send you the PDF file
+2. Set compression (optional): /compress_high, /compress_medium, /compress_low
+3. Use /convert when ready
+4. I'll send you the PDF file with size info
 
 **Commands:**
 /start - Show this help message
-/convert - Convert received images to PDF
-/clear - Clear pending images
 /help - Show help message
+/convert - Convert received images to PDF
+/compress_high - High quality (95%)
+/compress_medium - Medium quality (85%) - Default
+/compress_low - Low quality (70%) - Smallest file
+/clear - Clear pending images
 
 Send me some images to get started! 📸
         """
@@ -78,23 +84,56 @@ Send me some images to get started! 📸
 • GIF
 • WebP
 
+**Compression Options:**
+• /compress_high - Best quality (95%) - Larger files
+• /compress_medium - Good balance (85%) - Default
+• /compress_low - Smallest files (70%) - Lower quality
+
 **Usage:**
 1. Send one or more images
-2. Type /convert to process them
-3. Download the PDF file
+2. Set compression level (optional)
+3. Type /convert to process them
+4. Download the PDF file
+
+**File Size Info:**
+• Shows original image size
+• Shows final PDF size
+• Shows compression ratio when applicable
 
 **Commands:**
 /start - Start bot and see welcome message
 /convert - Convert images to PDF
+/compress_high - Set high quality compression
+/compress_medium - Set medium quality compression
+/compress_low - Set low quality compression
 /clear - Clear all pending images
 /help - Show this help message
 
 **Tips:**
 • Send multiple images to combine them into one PDF
 • Images are processed in the order you send them
+• Use compression for smaller file sizes
 • Temporary files are automatically cleaned up
         """
         await update.message.reply_text(help_message, parse_mode=ParseMode.MARKDOWN)
+    
+    async def set_compression_high(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Set compression to high quality"""
+        user_id = update.effective_user.id
+        self.user_compression_settings[user_id] = 'high'
+        await update.message.reply_text("🔧 Compression set to **High Quality (95%)**\nBest quality, larger file size.", parse_mode=ParseMode.MARKDOWN)
+    
+    async def set_compression_medium(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Set compression to medium quality"""
+        user_id = update.effective_user.id
+        self.user_compression_settings[user_id] = 'medium'
+        await update.message.reply_text("🔧 Compression set to **Medium Quality (85%)**\nGood balance of quality and size.", parse_mode=ParseMode.MARKDOWN)
+    
+    async def set_compression_low(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Set compression to low quality"""
+        user_id = update.effective_user.id
+        self.user_compression_settings[user_id] = 'low'
+        await update.message.reply_text("🔧 Compression set to **Low Quality (70%)**\nSmallest file size, lower quality.", parse_mode=ParseMode.MARKDOWN)
     
     async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /clear command"""
@@ -228,10 +267,12 @@ Send me some images to get started! 📸
             return
         
         image_count = len(self.user_temp_files[user_id])
+        compression = self.user_compression_settings.get(user_id, 'medium')
         
         # Send processing message
         processing_message = await update.message.reply_text(
             f"🔄 Converting {image_count} image(s) to PDF...\n"
+            f"Compression: {compression.title()} quality\n"
             f"This may take a moment..."
         )
         
@@ -245,25 +286,44 @@ Send me some images to get started! 📸
                 # Convert images to debug location
                 if image_count == 1:
                     # Single image conversion
-                    pdf_path = self.converter.convert_single_image(self.user_temp_files[user_id][0], debug_path)
+                    result = self.converter.convert_single_image(self.user_temp_files[user_id][0], debug_path, compression)
                 else:
                     # Multiple images conversion
-                    pdf_path = self.converter.convert_multiple_images(self.user_temp_files[user_id], debug_path)
+                    result = self.converter.convert_multiple_images(self.user_temp_files[user_id], debug_path, compression)
                 
+                pdf_path = result['pdf_path']
                 logger.info(f"Debug mode: PDF saved to {debug_path}")
             else:
                 # Normal conversion
                 if image_count == 1:
                     # Single image conversion
-                    pdf_path = self.converter.convert_single_image(self.user_temp_files[user_id][0])
+                    result = self.converter.convert_single_image(self.user_temp_files[user_id][0], compress=compression)
                 else:
                     # Multiple images conversion
-                    pdf_path = self.converter.convert_multiple_images(self.user_temp_files[user_id])
+                    result = self.converter.convert_multiple_images(self.user_temp_files[user_id], compress=compression)
+                
+                pdf_path = result['pdf_path']
             
-            # Send PDF file
+            # Create file size info message
+            if image_count == 1:
+                size_info = f"📊 **File Size Info:**\n"
+                size_info += f"📸 Original: {result['original_size']}\n"
+                size_info += f"📄 PDF: {result['pdf_size']}\n"
+                size_info += f"🔧 Compression: {result['compression_used'].title()}\n"
+                size_info += f"📐 Format: {result['original_format']}\n"
+                size_info += f"📏 Dimensions: {result['image_dimensions']}"
+            else:
+                size_info = f"📊 **File Size Info:**\n"
+                size_info += f"📸 Total Original: {result['total_original_size']}\n"
+                size_info += f"📄 PDF: {result['pdf_size']}\n"
+                size_info += f"🔧 Compression: {result['compression_used'].title()}\n"
+                size_info += f"🖼️ Images: {result['image_count']}"
+            
+            # Send PDF file with size info
             await update.message.reply_document(
                 document=open(pdf_path, 'rb'),
-                caption=f"✅ Converted {image_count} image(s) to PDF!"
+                caption=f"✅ Converted {image_count} image(s) to PDF!\n\n{size_info}",
+                parse_mode=ParseMode.MARKDOWN
             )
             
             # Update processing message
@@ -312,6 +372,9 @@ Send me some images to get started! 📸
         application.add_handler(CommandHandler("help", self.help_command))
         application.add_handler(CommandHandler("clear", self.clear_command))
         application.add_handler(CommandHandler("convert", self.convert_command))
+        application.add_handler(CommandHandler("compress_high", self.set_compression_high))
+        application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
+        application.add_handler(CommandHandler("compress_low", self.set_compression_low))
         
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
@@ -326,6 +389,9 @@ Send me some images to get started! 📸
             BotCommand("start", "Start bot and see welcome message"),
             BotCommand("help", "Show help message"),
             BotCommand("convert", "Convert images to PDF"),
+            BotCommand("compress_high", "Set high quality compression (95%)"),
+            BotCommand("compress_medium", "Set medium quality compression (85%)"),
+            BotCommand("compress_low", "Set low quality compression (70%)"),
             BotCommand("clear", "Clear all pending images")
         ]
         

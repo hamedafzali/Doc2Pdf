@@ -18,10 +18,13 @@ COPY telegram_bot.py .
 COPY bot_runner.py .
 COPY main.py .
 
-RUN mkdir -p debug_output
+# Create debug output directory with proper permissions
+RUN mkdir -p debug_output && chmod 777 debug_output
 
+# Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod 755 /app
 USER appuser
 
 EXPOSE 8080
