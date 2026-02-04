@@ -54,17 +54,22 @@ Welcome! I can convert your images to PDF format.
 
 **How to use:**
 1. Send me one or more images
-2. Set compression (optional): /compress_high, /compress_medium, /compress_low
-3. Use /convert when ready
-4. I'll send you the PDF file with size info
+2. Use /convert to see compression options
+3. Choose compression level:
+   - /compress_high (95%) - Best quality
+   - /compress_medium (85%) - Default
+   - /compress_low (70%) - Smallest file
+   - /convert_now - Use current setting
+4. Download the PDF file with detailed size info
 
 **Commands:**
 /start - Show this help message
 /help - Show help message
-/convert - Convert received images to PDF
-/compress_high - High quality (95%)
-/compress_medium - Medium quality (85%) - Default
-/compress_low - Low quality (70%) - Smallest file
+/convert - Choose compression options
+/convert_now - Convert with current settings
+/compress_high - Set high quality compression (95%)
+/compress_medium - Set medium quality compression (85%) - Default
+/compress_low - Set low quality compression (70%) - Smallest file
 /clear - Clear pending images
 
 Send me some images to get started! 📸
@@ -91,9 +96,9 @@ Send me some images to get started! 📸
 
 **Usage:**
 1. Send one or more images
-2. Set compression level (optional)
-3. Type /convert to process them
-4. Download the PDF file
+2. Use /convert to see compression options
+3. Choose compression level or use /convert_now
+4. Download the PDF file with detailed size information
 
 **File Size Info:**
 • Shows original image size
@@ -102,7 +107,8 @@ Send me some images to get started! 📸
 
 **Commands:**
 /start - Start bot and see welcome message
-/convert - Convert images to PDF
+/convert - Choose compression options
+/convert_now - Convert with current settings
 /compress_high - Set high quality compression
 /compress_medium - Set medium quality compression
 /compress_low - Set low quality compression
@@ -118,22 +124,28 @@ Send me some images to get started! 📸
         await update.message.reply_text(help_message, parse_mode=ParseMode.MARKDOWN)
     
     async def set_compression_high(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Set compression to high quality"""
+        """Set compression to high quality and convert"""
         user_id = update.effective_user.id
         self.user_compression_settings[user_id] = 'high'
         await update.message.reply_text("🔧 Compression set to **High Quality (95%)**\nBest quality, larger file size.", parse_mode=ParseMode.MARKDOWN)
+        # Auto-convert after setting compression
+        await self.convert_now_command(update, context)
     
     async def set_compression_medium(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Set compression to medium quality"""
+        """Set compression to medium quality and convert"""
         user_id = update.effective_user.id
         self.user_compression_settings[user_id] = 'medium'
         await update.message.reply_text("🔧 Compression set to **Medium Quality (85%)**\nGood balance of quality and size.", parse_mode=ParseMode.MARKDOWN)
+        # Auto-convert after setting compression
+        await self.convert_now_command(update, context)
     
     async def set_compression_low(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Set compression to low quality"""
+        """Set compression to low quality and convert"""
         user_id = update.effective_user.id
         self.user_compression_settings[user_id] = 'low'
         await update.message.reply_text("🔧 Compression set to **Low Quality (70%)**\nSmallest file size, lower quality.", parse_mode=ParseMode.MARKDOWN)
+        # Auto-convert after setting compression
+        await self.convert_now_command(update, context)
     
     async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /clear command"""
@@ -267,6 +279,31 @@ Send me some images to get started! 📸
             return
         
         image_count = len(self.user_temp_files[user_id])
+        
+        # Show compression options
+        compression_message = f"🖼️ Found {image_count} image(s) to convert\n\n"
+        compression_message += "🔧 **Choose compression level:**\n\n"
+        compression_message += "1️⃣ /compress_high - High Quality (95%)\n"
+        compression_message += "2️⃣ /compress_medium - Medium Quality (85%) - Default\n"
+        compression_message += "3️⃣ /compress_low - Low Quality (70%) - Smallest file\n\n"
+        compression_message += "4️⃣ /convert_now - Use current setting\n"
+        compression_message += f"Current setting: {self.user_compression_settings.get(user_id, 'medium').title()}"
+        
+        await update.message.reply_text(compression_message, parse_mode=ParseMode.MARKDOWN)
+    
+    async def convert_now_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /convert_now command - convert with current settings"""
+        user_id = update.effective_user.id
+        
+        # Check if user has pending images
+        if user_id not in self.user_temp_files or not self.user_temp_files[user_id]:
+            await update.message.reply_text(
+                "❌ No images to convert!\n\n"
+                "Please send me some images first, then use /convert."
+            )
+            return
+        
+        image_count = len(self.user_temp_files[user_id])
         compression = self.user_compression_settings.get(user_id, 'medium')
         
         # Send processing message
@@ -323,12 +360,15 @@ Send me some images to get started! 📸
             
             logger.info(f"Size info: {size_info}")
             
-            # Send PDF file with size info
+            # Send PDF file with simple caption
             await update.message.reply_document(
                 document=open(pdf_path, 'rb'),
-                caption=f"✅ Converted {image_count} image(s) to PDF!\n\n{size_info}",
+                caption=f"✅ Converted {image_count} image(s) to PDF!",
                 parse_mode=ParseMode.MARKDOWN
             )
+            
+            # Send file size info as separate message
+            await update.message.reply_text(size_info, parse_mode=ParseMode.MARKDOWN)
             
             # Update processing message
             await processing_message.edit_text("✅ Conversion completed!")
@@ -377,6 +417,7 @@ Send me some images to get started! 📸
         application.add_handler(CommandHandler("help", self.help_command))
         application.add_handler(CommandHandler("clear", self.clear_command))
         application.add_handler(CommandHandler("convert", self.convert_command))
+        application.add_handler(CommandHandler("convert_now", self.convert_now_command))
         application.add_handler(CommandHandler("compress_high", self.set_compression_high))
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
         application.add_handler(CommandHandler("compress_low", self.set_compression_low))
@@ -393,7 +434,8 @@ Send me some images to get started! 📸
         commands = [
             BotCommand("start", "Start bot and see welcome message"),
             BotCommand("help", "Show help message"),
-            BotCommand("convert", "Convert images to PDF"),
+            BotCommand("convert", "Choose compression options"),
+            BotCommand("convert_now", "Convert with current settings"),
             BotCommand("compress_high", "Set high quality compression (95%)"),
             BotCommand("compress_medium", "Set medium quality compression (85%)"),
             BotCommand("compress_low", "Set low quality compression (70%)"),
