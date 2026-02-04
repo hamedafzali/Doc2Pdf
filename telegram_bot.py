@@ -304,20 +304,24 @@ Send me some images to get started! 📸
                 
                 pdf_path = result['pdf_path']
             
+            logger.info(f"Conversion result: {result}")
+            
             # Create file size info message
             if image_count == 1:
                 size_info = f"📊 **File Size Info:**\n"
-                size_info += f"📸 Original: {result['original_size']}\n"
-                size_info += f"📄 PDF: {result['pdf_size']}\n"
-                size_info += f"🔧 Compression: {result['compression_used'].title()}\n"
-                size_info += f"📐 Format: {result['original_format']}\n"
-                size_info += f"📏 Dimensions: {result['image_dimensions']}"
+                size_info += f"📸 Original: {result.get('original_size', 'Unknown')}\n"
+                size_info += f"📄 PDF: {result.get('pdf_size', 'Unknown')}\n"
+                size_info += f"🔧 Compression: {result.get('compression_used', 'none').title()}\n"
+                size_info += f"📐 Format: {result.get('original_format', 'Unknown')}\n"
+                size_info += f"📏 Dimensions: {result.get('image_dimensions', 'Unknown')}"
             else:
                 size_info = f"📊 **File Size Info:**\n"
-                size_info += f"📸 Total Original: {result['total_original_size']}\n"
-                size_info += f"📄 PDF: {result['pdf_size']}\n"
-                size_info += f"🔧 Compression: {result['compression_used'].title()}\n"
-                size_info += f"🖼️ Images: {result['image_count']}"
+                size_info += f"📸 Total Original: {result.get('total_original_size', 'Unknown')}\n"
+                size_info += f"📄 PDF: {result.get('pdf_size', 'Unknown')}\n"
+                size_info += f"🔧 Compression: {result.get('compression_used', 'none').title()}\n"
+                size_info += f"🖼️ Images: {result.get('image_count', 'Unknown')}"
+            
+            logger.info(f"Size info: {size_info}")
             
             # Send PDF file with size info
             await update.message.reply_document(
@@ -337,6 +341,7 @@ Send me some images to get started! 📸
             
         except Exception as e:
             logger.error(f"Error converting images: {e}")
+            logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
             await processing_message.edit_text(
                 f"❌ Error during conversion: {str(e)}\n"
                 f"Please try again."
