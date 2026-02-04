@@ -9,14 +9,14 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+# Copy application code
+COPY *.py ./
+COPY requirements.txt ./
+COPY templates/ ./templates/
+COPY static/ ./static/
 
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-
-COPY image_converter.py .
-COPY telegram_bot.py .
-COPY bot_runner.py .
-COPY main.py .
 
 # Create debug output directory with proper permissions
 RUN mkdir -p debug_output && chmod 777 debug_output
@@ -25,14 +25,18 @@ RUN mkdir -p debug_output && chmod 777 debug_output
 RUN useradd --create-home --shell /bin/bash appuser && \
     chown -R appuser:appuser /app && \
     chmod 755 /app
+
 USER appuser
 
-EXPOSE 8080
-
+# Environment variables
 ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
 
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import telegram_bot; print('OK')" || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:5000/api/status')" || \
+    python -c "import subprocess; subprocess.run(['pgrep', '-f', 'python'], check=True)" || \
+    exit 1
 
-CMD ["python", "bot_runner.py"]
+# Default command (can be overridden)
+CMD ["python", "web_runner.py"]

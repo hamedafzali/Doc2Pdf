@@ -1,0 +1,42 @@
+services:
+  # Web Manager Service
+  web-manager:
+    build: .
+    container_name: doc2pdf-web-manager
+    ports:
+      - "5000:5000"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./debug_output:/app/debug_output
+    restart: unless-stopped
+    command: python web_manager.py
+    networks:
+      - doc2pdf-network
+
+  # Bot Service (managed by web manager)
+  # This will be created/managed by the web interface
+  # bot:
+  #   image: doc2pdf-bot
+  #   container_name: doc2pdf-bot
+  #   environment:
+  #     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+  #     - DEBUG_MODE=${DEBUG_MODE:-false}
+  #   volumes:
+  #     - ./debug_output:/app/debug_output
+  #   restart: unless-stopped
+  #   command: python bot_runner.py
+  #   networks:
+  #     - doc2pdf-network
+  #   depends_on:
+  #     - web-manager
+
+networks:
+  doc2pdf-network:
+    driver: bridge
+
+volumes:
+  debug_output:
+    driver: local
