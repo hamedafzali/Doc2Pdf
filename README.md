@@ -119,9 +119,67 @@ Doc2Pdf/
 └── README.md                # User documentation
 ```
 
+## Docker Deployment
+
+### Quick Start with Docker Compose
+
+1. **Clone and setup:**
+
+   ```bash
+   git clone https://github.com/hamedafzali/Doc2Pdf.git
+   cd Doc2Pdf
+   ```
+
+2. **Configure environment:**
+
+   ```bash
+   cp .env.example .env
+   # Edit .env with your bot token
+   ```
+
+3. **Run with Docker Compose:**
+   ```bash
+   docker-compose up -d
+   ```
+
+### Manual Docker Build
+
+1. **Build the image:**
+
+   ```bash
+   docker build -t doc2pdf-bot .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -d \
+     --name doc2pdf-bot \
+     --restart unless-stopped \
+     -e TELEGRAM_BOT_TOKEN=your_token_here \
+     -e DEBUG_MODE=true \
+     -v $(pwd)/debug_output:/app/debug_output \
+     doc2pdf-bot
+   ```
+
+### Docker Management
+
+- **View logs:** `docker-compose logs -f`
+- **Stop bot:** `docker-compose down`
+- **Restart bot:** `docker-compose restart`
+- **Debug output:** Check `debug_output/` directory
+
+### Docker Features
+
+- **Multi-stage build** for optimized image size
+- **Non-root user** for security
+- **Health checks** for monitoring
+- **Volume mounting** for persistent debug output
+- **Environment variable configuration**
+
 ## Requirements
 
-- Python 3.7+
+- Python 3.7+ (for local development)
+- Docker & Docker Compose (for containerized deployment)
 - Telegram Bot Token (for bot functionality)
 - See requirements.txt for package dependencies
 

@@ -17,10 +17,6 @@ A Python application that converts images to PDF format with support for both st
 
 ✅ Core image conversion functionality implemented
 ✅ CLI interface created
-✅ Project structure established
-✅ Telegram bot implementation completed
-✅ Bot handlers and configuration ready
-⏳ Production deployment and testing
 
 ## Project Structure
 
@@ -31,6 +27,9 @@ Doc2Pdf/
 ├── main.py                   # CLI application
 ├── telegram_bot.py          # Telegram bot implementation
 ├── bot_runner.py            # Bot launcher script
+├── Dockerfile               # Docker container configuration
+├── docker-compose.yml       # Docker Compose configuration
+├── .dockerignore            # Docker ignore file
 ├── .env.example             # Environment configuration template
 ├── PROJECT.md               # Project documentation
 └── README.md                # User documentation

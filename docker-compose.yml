@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  doc2pdf-bot:
+    build: .
+    container_name: doc2pdf-telegram-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+    volumes:
+      - ./debug_output:/app/debug_output
+    networks:
+      - doc2pdf-network
+
+networks:
+  doc2pdf-network:
+    driver: bridge
+
+volumes:
+  debug_output:
+    driver: local
