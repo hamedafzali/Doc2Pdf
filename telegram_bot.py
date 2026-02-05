@@ -1,15 +1,18 @@
+#!/usr/bin/env python3
 """
-Telegram Bot for Image to PDF Converter
-Handles image uploads and converts them to PDF
+Refactored Telegram Bot for Image to PDF Converter
+Clean, modular, and maintainable codebase
 """
 
 import os
 import tempfile
 import logging
-from pathlib import Path
-from typing import List, Optional
 import asyncio
+from pathlib import Path
+from typing import List, Optional, Dict, Any
 from datetime import datetime
+from dataclasses import dataclass
+from enum import Enum
 
 from telegram import Update, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -24,24 +27,89 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class ImageToPdfBot:
-    """Telegram bot for converting images to PDF"""
+
+class CompressionLevel(Enum):
+    """Compression quality levels"""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
     
-    def __init__(self, token: str):
-        self.token = token
-        self.converter = ImageToPdfConverter()
-        self.user_temp_files = {}  # Track temporary files per user
-        self.user_compression_settings = {}  # Track compression settings per user
-        self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
-        self.debug_dir = 'debug_output'
+    @property
+    def quality(self) -> int:
+        """Get compression quality percentage"""
+        return {
+            CompressionLevel.HIGH: 95,
+            CompressionLevel.MEDIUM: 85,
+            CompressionLevel.LOW: 70
+        }[self]
+    
+    @property
+    def title(self) -> str:
+        """Get human-readable title"""
+        return {
+            CompressionLevel.HIGH: "High Quality (95%)",
+            CompressionLevel.MEDIUM: "Medium Quality (85%)",
+            CompressionLevel.LOW: "Low Quality (70%)"
+        }[self]
+
+
+@dataclass
+class ConversionResult:
+    """Result of image conversion"""
+    success: bool
+    pdf_path: Optional[str] = None
+    original_size: Optional[str] = None
+    pdf_size: Optional[str] = None
+    compression_used: Optional[CompressionLevel] = None
+    original_format: Optional[str] = None
+    image_dimensions: Optional[str] = None
+    image_count: Optional[int] = None
+    total_original_size: Optional[str] = None
+    error_message: Optional[str] = None
+
+
+@dataclass
+class ImageInfo:
+    """Information about processed image"""
+    file_path: str
+    size: str
+    format: str
+    dimensions: Optional[str] = None
+
+
+class UserSession:
+    """Manages user session data"""
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.temp_files: List[str] = []
+        self.compression_setting: CompressionLevel = CompressionLevel.MEDIUM
         
-        # Create debug directory if in debug mode
-        if self.debug_mode:
-            os.makedirs(self.debug_dir, exist_ok=True)
-        
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command"""
-        welcome_message = """
+    def add_temp_file(self, file_path: str):
+        """Add temporary file to session"""
+        self.temp_files.append(file_path)
+    
+    def clear_temp_files(self):
+        """Clean up all temporary files"""
+        for file_path in self.temp_files:
+            try:
+                os.unlink(file_path)
+                logger.debug(f"Cleaned up temporary file: {file_path}")
+            except Exception as e:
+                logger.error(f"Error cleaning up file {file_path}: {e}")
+        self.temp_files.clear()
+    
+    def get_file_count(self) -> int:
+        """Get number of pending files"""
+        return len(self.temp_files)
+
+
+class MessageTemplates:
+    """Centralized message templates"""
+    
+    @staticmethod
+    def welcome() -> str:
+        """Welcome message"""
+        return """
 🖼️ **Image to PDF Converter Bot**
 
 Welcome! I can convert your images to PDF format.
@@ -74,11 +142,11 @@ Welcome! I can convert your images to PDF format.
 
 Send me some images to get started! 📸
         """
-        await update.message.reply_text(welcome_message, parse_mode=ParseMode.MARKDOWN)
     
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /help command"""
-        help_message = """
+    @staticmethod
+    def help() -> str:
+        """Help message"""
+        return """
 📖 **Help - Image to PDF Converter**
 
 **Supported Formats:**
@@ -121,55 +189,281 @@ Send me some images to get started! 📸
 • Use compression for smaller file sizes
 • Temporary files are automatically cleaned up
         """
-        await update.message.reply_text(help_message, parse_mode=ParseMode.MARKDOWN)
     
-    async def set_compression_high(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Set compression to high quality and convert"""
-        user_id = update.effective_user.id
-        self.user_compression_settings[user_id] = 'high'
-        await update.message.reply_text("🔧 Compression set to **High Quality (95%)**\nBest quality, larger file size.", parse_mode=ParseMode.MARKDOWN)
-        # Auto-convert after setting compression
-        await self.convert_now_command(update, context)
+    @staticmethod
+    def compression_options(image_count: int, current_setting: CompressionLevel) -> str:
+        """Compression options message"""
+        message = f"🖼️ Found {image_count} image(s) to convert\n\n"
+        message += "🔧 **Choose compression level:**\n\n"
+        message += "1️⃣ /compress_high - High Quality (95%)\n"
+        message += "2️⃣ /compress_medium - Medium Quality (85%) - Default\n"
+        message += "3️⃣ /compress_low - Low Quality (70%) - Smallest file\n"
+        message += "4️⃣ /convert_now - Use current setting\n"
+        message += f"Current setting: {current_setting.title}"
+        return message
     
-    async def set_compression_medium(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Set compression to medium quality and convert"""
-        user_id = update.effective_user.id
-        self.user_compression_settings[user_id] = 'medium'
-        await update.message.reply_text("🔧 Compression set to **Medium Quality (85%)**\nGood balance of quality and size.", parse_mode=ParseMode.MARKDOWN)
-        # Auto-convert after setting compression
-        await self.convert_now_command(update, context)
+    @staticmethod
+    def image_received(file_info: ImageInfo, pending_count: int) -> str:
+        """Image received confirmation"""
+        return (
+            f"✅ Image received!\n"
+            f"Format: {file_info.format}\n"
+            f"Size: {file_info.size}\n"
+            f"Images pending: {pending_count}\n\n"
+            f"Send more images or use /convert when ready!"
+        )
     
-    async def set_compression_low(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Set compression to low quality and convert"""
-        user_id = update.effective_user.id
-        self.user_compression_settings[user_id] = 'low'
-        await update.message.reply_text("🔧 Compression set to **Low Quality (70%)**\nSmallest file size, lower quality.", parse_mode=ParseMode.MARKDOWN)
-        # Auto-convert after setting compression
-        await self.convert_now_command(update, context)
+    @staticmethod
+    def processing_start(image_count: int, compression: CompressionLevel) -> str:
+        """Processing started message"""
+        return (
+            f"🔄 Converting {image_count} image(s) to PDF...\n"
+            f"Compression: {compression.title}\n"
+            f"This may take a moment..."
+        )
     
-    async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    @staticmethod
+    def conversion_success(result: ConversionResult, image_count: int) -> str:
+        """Conversion success message"""
+        if image_count == 1:
+            return "✅ Conversion completed!"
+        else:
+            return f"✅ {image_count} images converted to PDF!"
+    
+    @staticmethod
+    def file_size_info(result: ConversionResult) -> str:
+        """File size information"""
+        if result.image_count == 1:
+            return (
+                "📊 **File Size Info:**\n"
+                f"📸 Original: {result.original_size}\n"
+                f"📄 PDF: {result.pdf_size}\n"
+                f"🔧 Compression: {result.compression_used.title}\n"
+                f"📐 Format: {result.original_format}\n"
+                f"📏 Dimensions: {result.image_dimensions}"
+            )
+        else:
+            return (
+                "📊 **File Size Info:**\n"
+                f"📸 Total Original: {result.total_original_size}\n"
+                f"📄 PDF: {result.pdf_size}\n"
+                f"🔧 Compression: {result.compression_used.title}\n"
+                f"🖼️ Images: {result.image_count}"
+            )
+    
+    @staticmethod
+    def conversion_error(error_message: str) -> str:
+        """Conversion error message"""
+        return f"❌ Error during conversion: {error_message}\nPlease try again."
+    
+    @staticmethod
+    def no_images() -> str:
+        """No images message"""
+        return "❌ No images to convert!\n\nPlease send me some images first, then use /convert."
+    
+    @staticmethod
+    def invalid_image() -> str:
+        """Invalid image message"""
+        return "❌ Invalid image format. Please send a valid image."
+    
+    @staticmethod
+    def unsupported_format(file_extension: str, supported_formats: List[str]) -> str:
+        """Unsupported format message"""
+        return (
+            f"❌ Unsupported format: {file_extension}\n"
+            f"Supported formats: {', '.join(supported_formats)}"
+        )
+    
+    @staticmethod
+    def files_cleared() -> str:
+        """Files cleared message"""
+        return "🗑️ Cleared all pending images!"
+    
+    @staticmethod
+    def compression_set(compression: CompressionLevel) -> str:
+        """Compression set message"""
+        return f"🔧 Compression set to **{compression.title}**"
+
+
+class ImageToPdfBot:
+    """Refactored Telegram bot for converting images to PDF"""
+    
+    def __init__(self, token: str):
+        self.token = token
+        self.converter = ImageToPdfConverter()
+        self.user_sessions: Dict[int, UserSession] = {}
+        self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+        self.debug_dir = 'debug_output'
+        
+        # Create debug directory if in debug mode
+        if self.debug_mode:
+            os.makedirs(self.debug_dir, exist_ok=True)
+        
+        logger.info(f"Bot initialized. Debug mode: {self.debug_mode}")
+    
+    def get_user_session(self, user_id: int) -> UserSession:
+        """Get or create user session"""
+        if user_id not in self.user_sessions:
+            self.user_sessions[user_id] = UserSession(user_id)
+        return self.user_sessions[user_id]
+    
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /start command"""
+        await update.message.reply_text(MessageTemplates.welcome(), parse_mode=ParseMode.MARKDOWN)
+    
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /help command"""
+        await update.message.reply_text(MessageTemplates.help(), parse_mode=ParseMode.MARKDOWN)
+    
+    async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /clear command"""
-        user_id = update.effective_user.id
-        
-        # Clean up temporary files for this user
-        if user_id in self.user_temp_files:
-            for file_path in self.user_temp_files[user_id]:
-                try:
-                    os.unlink(file_path)
-                except Exception as e:
-                    logger.error(f"Error cleaning up file {file_path}: {e}")
-            
-            del self.user_temp_files[user_id]
-        
-        await update.message.reply_text("🗑️ Cleared all pending images!")
+        session = self.get_user_session(update.effective_user.id)
+        session.clear_temp_files()
+        await update.message.reply_text(MessageTemplates.files_cleared())
     
-    async def handle_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle incoming images"""
-        user_id = update.effective_user.id
+    async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
+        """Set compression level and convert"""
+        session = self.get_user_session(update.effective_user.id)
+        session.compression_setting = compression
         
-        # Initialize user temp files list if needed
-        if user_id not in self.user_temp_files:
-            self.user_temp_files[user_id] = []
+        await update.message.reply_text(MessageTemplates.compression_set(compression), parse_mode=ParseMode.MARKDOWN)
+        # Auto-convert after setting compression
+        await self.convert_now_command(update, context)
+    
+    async def set_compression_high(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Set high quality compression"""
+        await self.set_compression(update, context, CompressionLevel.HIGH)
+    
+    async def set_compression_medium(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Set medium quality compression"""
+        await self.set_compression(update, context, CompressionLevel.MEDIUM)
+    
+    async def set_compression_low(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Set low quality compression"""
+        await self.set_compression(update, context, CompressionLevel.LOW)
+    
+    async def convert_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /convert command"""
+        session = self.get_user_session(update.effective_user.id)
+        
+        if not session.get_file_count():
+            await update.message.reply_text(MessageTemplates.no_images())
+            return
+        
+        await update.message.reply_text(
+            MessageTemplates.compression_options(session.get_file_count(), session.compression_setting),
+            parse_mode=ParseMode.MARKDOWN
+        )
+    
+    async def convert_now_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /convert_now command"""
+        session = self.get_user_session(update.effective_user.id)
+        
+        if not session.get_file_count():
+            await update.message.reply_text(MessageTemplates.no_images())
+            return
+        
+        image_count = session.get_file_count()
+        compression = session.compression_setting
+        
+        # Send processing message
+        processing_message = await update.message.reply_text(
+            MessageTemplates.processing_start(image_count, compression)
+        )
+        
+        try:
+            # Generate debug filename if in debug mode
+            if self.debug_mode:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                debug_filename = f"user_{update.effective_user.id}_{timestamp}_{image_count}images.pdf"
+                debug_path = os.path.join(self.debug_dir, debug_filename)
+                
+                # Convert images to debug location
+                if image_count == 1:
+                    result = self._convert_single_image(session.temp_files[0], debug_path, compression)
+                else:
+                    result = self._convert_multiple_images(session.temp_files, debug_path, compression)
+                
+                logger.info(f"Debug mode: PDF saved to {debug_path}")
+            else:
+                # Normal conversion
+                if image_count == 1:
+                    result = self._convert_single_image(session.temp_files[0], compress=compression)
+                else:
+                    result = self._convert_multiple_images(session.temp_files, compress=compression)
+            
+            # Send results
+            await self._send_conversion_results(update, result, processing_message, image_count)
+            
+        except Exception as e:
+            logger.error(f"Error converting images: {e}")
+            await processing_message.edit_text(MessageTemplates.conversion_error(str(e)))
+        
+        finally:
+            # Clean up temporary files
+            session.clear_temp_files()
+    
+    async def _convert_single_image(self, image_path: str, output_path: Optional[str] = None, compress: CompressionLevel = CompressionLevel.MEDIUM) -> ConversionResult:
+        """Convert single image to PDF"""
+        try:
+            result = self.converter.convert_single_image(image_path, output_path, compress)
+            return ConversionResult(
+                success=True,
+                pdf_path=result['pdf_path'],
+                original_size=result.get('original_size'),
+                pdf_size=result.get('pdf_size'),
+                compression_used=compress,
+                original_format=result.get('original_format'),
+                image_dimensions=result.get('image_dimensions')
+            )
+        except Exception as e:
+            logger.error(f"Error converting single image: {e}")
+            return ConversionResult(success=False, error_message=str(e))
+    
+    async def _convert_multiple_images(self, image_paths: List[str], output_path: Optional[str] = None, compress: CompressionLevel = CompressionLevel.MEDIUM) -> ConversionResult:
+        """Convert multiple images to PDF"""
+        try:
+            result = self.converter.convert_multiple_images(image_paths, output_path, compress)
+            return ConversionResult(
+                success=True,
+                pdf_path=result['pdf_path'],
+                total_original_size=result.get('total_original_size'),
+                pdf_size=result.get('pdf_size'),
+                compression_used=compress,
+                image_count=result.get('image_count')
+            )
+        except Exception as e:
+            logger.error(f"Error converting multiple images: {e}")
+            return ConversionResult(success=False, error_message=str(e))
+    
+    async def _send_conversion_results(self, update: Update, result: ConversionResult, processing_message, image_count: int) -> None:
+        """Send conversion results to user"""
+        if not result.success:
+            await processing_message.edit_text(MessageTemplates.conversion_error(result.error_message))
+            return
+        
+        # Send PDF file
+        await update.message.reply_document(
+            document=open(result.pdf_path, 'rb'),
+            caption=MessageTemplates.conversion_success(result, image_count),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        # Update processing message
+        await processing_message.edit_text(MessageTemplates.conversion_success(result, image_count))
+        
+        # Send file size info
+        await update.message.reply_text(MessageTemplates.file_size_info(result), parse_mode=ParseMode.MARKDOWN)
+        
+        # Clean up PDF file after sending (only if not in debug mode)
+        if not self.debug_mode:
+            os.unlink(result.pdf_path)
+        else:
+            await update.message.reply_text(f"📁 Debug mode: PDF saved to {result.pdf_path}")
+    
+    async def handle_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle incoming images"""
+        session = self.get_user_session(update.effective_user.id)
         
         # Get the largest photo available
         photo = update.message.photo[-1]
@@ -181,36 +475,24 @@ Send me some images to get started! 📸
             await file.download_to_drive(temp_file.name)
             
             # Store temp file path
-            self.user_temp_files[user_id].append(temp_file.name)
+            session.add_temp_file(temp_file.name)
             
-            # Check if it's a valid image
-            try:
-                img_info = self.converter.get_image_info(temp_file.name)
-                if img_info:
-                    await update.message.reply_text(
-                        f"✅ Image received!\n"
-                        f"Format: {img_info.get('format', 'Unknown')}\n"
-                        f"Size: {img_info.get('size', 'Unknown')}\n"
-                        f"Images pending: {len(self.user_temp_files[user_id])}\n\n"
-                        f"Send more images or use /convert when ready!"
-                    )
-                else:
-                    await update.message.reply_text("❌ Invalid image format. Please send a valid image.")
-                    # Clean up invalid file
-                    os.unlink(temp_file.name)
-                    self.user_temp_files[user_id].remove(temp_file.name)
-                    
-            except Exception as e:
-                logger.error(f"Error processing image: {e}")
-                await update.message.reply_text("❌ Error processing image. Please try again.")
-                # Clean up on error
+            # Get image info
+            img_info = self._get_image_info(temp_file.name)
+            if img_info:
+                await update.message.reply_text(
+                    MessageTemplates.image_received(img_info, session.get_file_count()),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            else:
+                await update.message.reply_text(MessageTemplates.invalid_image())
+                # Clean up invalid file
                 os.unlink(temp_file.name)
-                if temp_file.name in self.user_temp_files[user_id]:
-                    self.user_temp_files[user_id].remove(temp_file.name)
+                session.temp_files.remove(temp_file.name)
     
-    async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle document uploads (images sent as files)"""
-        user_id = update.effective_user.id
+        session = self.get_user_session(update.effective_user.id)
         document = update.message.document
         
         # Check if document is an image
@@ -218,16 +500,11 @@ Send me some images to get started! 📸
             await update.message.reply_text("❌ Please send only image files.")
             return
         
-        # Initialize user temp files list if needed
-        if user_id not in self.user_temp_files:
-            self.user_temp_files[user_id] = []
-        
         # Get file extension
         file_extension = Path(document.file_name).suffix.lower()
         if file_extension not in self.converter.supported_formats:
             await update.message.reply_text(
-                f"❌ Unsupported format: {file_extension}\n"
-                f"Supported formats: {', '.join(self.converter.supported_formats)}"
+                MessageTemplates.unsupported_format(file_extension, self.converter.supported_formats)
             )
             return
         
@@ -238,167 +515,37 @@ Send me some images to get started! 📸
             await file.download_to_drive(temp_file.name)
             
             # Store temp file path
-            self.user_temp_files[user_id].append(temp_file.name)
+            session.add_temp_file(temp_file.name)
             
-            # Check if it's a valid image
-            try:
-                img_info = self.converter.get_image_info(temp_file.name)
-                if img_info:
-                    await update.message.reply_text(
-                        f"✅ Image received!\n"
-                        f"File: {document.file_name}\n"
-                        f"Format: {img_info.get('format', 'Unknown')}\n"
-                        f"Size: {img_info.get('size', 'Unknown')}\n"
-                        f"Images pending: {len(self.user_temp_files[user_id])}\n\n"
-                        f"Send more images or use /convert when ready!"
-                    )
-                else:
-                    await update.message.reply_text("❌ Invalid image file. Please send a valid image.")
-                    # Clean up invalid file
-                    os.unlink(temp_file.name)
-                    self.user_temp_files[user_id].remove(temp_file.name)
-                    
-            except Exception as e:
-                logger.error(f"Error processing document: {e}")
-                await update.message.reply_text("❌ Error processing image. Please try again.")
-                # Clean up on error
+            # Get image info
+            img_info = self._get_image_info(temp_file.name)
+            if img_info:
+                await update.message.reply_text(
+                    MessageTemplates.image_received(img_info, session.get_file_count()),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            else:
+                await update.message.reply_text(MessageTemplates.invalid_image())
+                # Clean up invalid file
                 os.unlink(temp_file.name)
-                if temp_file.name in self.user_temp_files[user_id]:
-                    self.user_temp_files[user_id].remove(temp_file.name)
+                session.temp_files.remove(temp_file.name)
     
-    async def convert_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /convert command"""
-        user_id = update.effective_user.id
-        
-        # Check if user has pending images
-        if user_id not in self.user_temp_files or not self.user_temp_files[user_id]:
-            await update.message.reply_text(
-                "❌ No images to convert!\n\n"
-                "Please send me some images first, then use /convert."
-            )
-            return
-        
-        image_count = len(self.user_temp_files[user_id])
-        
-        # Show compression options
-        compression_message = f"🖼️ Found {image_count} image(s) to convert\n\n"
-        compression_message += "🔧 **Choose compression level:**\n\n"
-        compression_message += "1️⃣ /compress_high - High Quality (95%)\n"
-        compression_message += "2️⃣ /compress_medium - Medium Quality (85%) - Default\n"
-        compression_message += "3️⃣ /compress_low - Low Quality (70%) - Smallest file\n\n"
-        compression_message += "4️⃣ /convert_now - Use current setting\n"
-        compression_message += f"Current setting: {self.user_compression_settings.get(user_id, 'medium').title()}"
-        
-        await update.message.reply_text(compression_message, parse_mode=ParseMode.MARKDOWN)
-    
-    async def convert_now_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /convert_now command - convert with current settings"""
-        user_id = update.effective_user.id
-        
-        # Check if user has pending images
-        if user_id not in self.user_temp_files or not self.user_temp_files[user_id]:
-            await update.message.reply_text(
-                "❌ No images to convert!\n\n"
-                "Please send me some images first, then use /convert."
-            )
-            return
-        
-        image_count = len(self.user_temp_files[user_id])
-        compression = self.user_compression_settings.get(user_id, 'medium')
-        
-        # Send processing message
-        processing_message = await update.message.reply_text(
-            f"🔄 Converting {image_count} image(s) to PDF...\n"
-            f"Compression: {compression.title()} quality\n"
-            f"This may take a moment..."
-        )
-        
+    def _get_image_info(self, image_path: str) -> Optional[ImageInfo]:
+        """Get image information"""
         try:
-            # Generate debug filename if in debug mode
-            if self.debug_mode:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                debug_filename = f"user_{user_id}_{timestamp}_{image_count}images.pdf"
-                debug_path = os.path.join(self.debug_dir, debug_filename)
-                
-                # Convert images to debug location
-                if image_count == 1:
-                    # Single image conversion
-                    result = self.converter.convert_single_image(self.user_temp_files[user_id][0], debug_path, compression)
-                else:
-                    # Multiple images conversion
-                    result = self.converter.convert_multiple_images(self.user_temp_files[user_id], debug_path, compression)
-                
-                pdf_path = result['pdf_path']
-                logger.info(f"Debug mode: PDF saved to {debug_path}")
-            else:
-                # Normal conversion
-                if image_count == 1:
-                    # Single image conversion
-                    result = self.converter.convert_single_image(self.user_temp_files[user_id][0], compress=compression)
-                else:
-                    # Multiple images conversion
-                    result = self.converter.convert_multiple_images(self.user_temp_files[user_id], compress=compression)
-                
-                pdf_path = result['pdf_path']
-            
-            logger.info(f"Conversion result: {result}")
-            
-            # Create file size info message
-            if image_count == 1:
-                size_info = f"📊 **File Size Info:**\n"
-                size_info += f"📸 Original: {result.get('original_size', 'Unknown')}\n"
-                size_info += f"📄 PDF: {result.get('pdf_size', 'Unknown')}\n"
-                size_info += f"🔧 Compression: {result.get('compression_used', 'none').title()}\n"
-                size_info += f"📐 Format: {result.get('original_format', 'Unknown')}\n"
-                size_info += f"📏 Dimensions: {result.get('image_dimensions', 'Unknown')}"
-            else:
-                size_info = f"📊 **File Size Info:**\n"
-                size_info += f"📸 Total Original: {result.get('total_original_size', 'Unknown')}\n"
-                size_info += f"📄 PDF: {result.get('pdf_size', 'Unknown')}\n"
-                size_info += f"🔧 Compression: {result.get('compression_used', 'none').title()}\n"
-                size_info += f"🖼️ Images: {result.get('image_count', 'Unknown')}"
-            
-            logger.info(f"Size info: {size_info}")
-            
-            # Send PDF file with simple caption
-            await update.message.reply_document(
-                document=open(pdf_path, 'rb'),
-                caption=f"✅ Converted {image_count} image(s) to PDF!",
-                parse_mode=ParseMode.MARKDOWN
-            )
-            
-            # Send file size info as separate message
-            await update.message.reply_text(size_info, parse_mode=ParseMode.MARKDOWN)
-            
-            # Update processing message
-            await processing_message.edit_text("✅ Conversion completed!")
-            
-            # Clean up PDF file after sending (only if not in debug mode)
-            if not self.debug_mode:
-                os.unlink(pdf_path)
-            else:
-                await update.message.reply_text(f"📁 Debug mode: PDF saved to {debug_path}")
-            
+            info = self.converter.get_image_info(image_path)
+            if info:
+                return ImageInfo(
+                    file_path=image_path,
+                    size=info.get('size', 'Unknown'),
+                    format=info.get('format', 'Unknown'),
+                    dimensions=info.get('dimensions', 'Unknown')
+                )
         except Exception as e:
-            logger.error(f"Error converting images: {e}")
-            logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
-            await processing_message.edit_text(
-                f"❌ Error during conversion: {str(e)}\n"
-                f"Please try again."
-            )
-        
-        finally:
-            # Clean up user's temporary files
-            if user_id in self.user_temp_files:
-                for file_path in self.user_temp_files[user_id]:
-                    try:
-                        os.unlink(file_path)
-                    except Exception as e:
-                        logger.error(f"Error cleaning up file {file_path}: {e}")
-                
-                del self.user_temp_files[user_id]
+            logger.error(f"Error getting image info: {e}")
+        return None
     
-    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE):
+    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle errors"""
         logger.error(f"Update {update} caused error {context.error}")
         
@@ -410,7 +557,7 @@ Send me some images to get started! 📸
             except Exception:
                 pass
     
-    def setup_handlers(self, application: Application):
+    def setup_handlers(self, application: Application) -> None:
         """Setup bot handlers"""
         # Command handlers
         application.add_handler(CommandHandler("start", self.start))
@@ -420,7 +567,7 @@ Send me some images to get started! 📸
         application.add_handler(CommandHandler("convert_now", self.convert_now_command))
         application.add_handler(CommandHandler("compress_high", self.set_compression_high))
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
-        application.add_handler(CommandHandler("compress_low", self.set_compression_low))
+        application.add_handler(CommandHandler("compress_low", set_compression_low))
         
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
@@ -429,7 +576,7 @@ Send me some images to get started! 📸
         # Error handler
         application.add_error_handler(self.error_handler)
     
-    async def set_bot_commands(self, application: Application):
+    async def set_bot_commands(self, application: Application) -> None:
         """Set bot commands"""
         commands = [
             BotCommand("start", "Start bot and see welcome message"),
@@ -444,7 +591,7 @@ Send me some images to get started! 📸
         
         await application.bot.set_my_commands(commands)
     
-    def run(self):
+    def run(self) -> None:
         """Run the bot"""
         application = Application.builder().token(self.token).build()
         
@@ -460,6 +607,30 @@ Send me some images to get started! 📸
         logger.info("Starting Image to PDF Bot...")
         application.run_polling()
 
+
 def create_bot(token: str) -> ImageToPdfBot:
     """Create bot instance"""
     return ImageToPdfBot(token)
+
+
+def main() -> None:
+    """Main function to run the bot"""
+    import os
+    from dotenv import load_dotenv
+    
+    # Load environment variables
+    load_dotenv()
+    
+    # Get bot token
+    token = os.getenv('TELEGRAM_BOT_TOKEN')
+    if not token:
+        print("Error: TELEGRAM_BOT_TOKEN environment variable is required")
+        return
+    
+    # Create and run bot
+    bot = create_bot(token)
+    bot.run()
+
+
+if __name__ == '__main__':
+    main()

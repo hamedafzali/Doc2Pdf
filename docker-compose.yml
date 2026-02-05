@@ -1,16 +1,22 @@
+version: "3.8"
+
 services:
   doc2pdf-bot:
     build: .
-    container_name: doc2pdf-telegram-bot
+    container_name: doc2pdf-bot
     restart: unless-stopped
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DEBUG_MODE=${DEBUG_MODE:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./debug_output:/app/debug_output
-    networks:
-      - doc2pdf-network
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "python"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   doc2pdf-network:

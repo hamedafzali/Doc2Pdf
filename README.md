@@ -1,218 +1,354 @@
-# Image to PDF Converter
+# Doc2Pdf Bot
 
-A Python application that converts images to PDF format with support for both standalone usage and Telegram bot integration.
+A powerful Telegram bot that converts images to PDF with compression options.
 
-## Installation
+## 🚀 Features
 
-1. Clone the repository:
+### Core Functionality
+
+- **Image to PDF Conversion**: Convert single images or multiple images to PDF
+- **Multiple Formats**: Supports JPG, PNG, BMP, TIFF, GIF, WebP
+- **Compression Options**: Three quality levels (High 95%, Medium 85%, Low 70%)
+- **File Size Information**: Shows original and final file sizes
+- **Batch Processing**: Combine multiple images into one PDF
+- **Interactive Interface**: Easy-to-use Telegram bot interface
+
+### Advanced Features
+
+- **Smart Compression**: Choose between quality and file size
+- **Real-time Processing**: Get instant feedback on your conversions
+- **Debug Mode**: Save PDFs locally for testing
+- **Clean Architecture**: Well-structured, maintainable codebase
+- **Error Handling**: Robust error handling and user feedback
+
+## 🛠️ Installation
+
+### Prerequisites
+
+- Python 3.8 or higher
+- Telegram Bot Token (get from @BotFather)
+
+### Quick Start
 
 ```bash
+# Clone the repository
 git clone <repository-url>
 cd Doc2Pdf
-```
 
-2. Create and activate virtual environment:
-
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-
-```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your TELEGRAM_BOT_TOKEN
+
+# Run the bot
+python bot_runner.py
 ```
 
-## Usage
-
-### CLI Usage
-
-#### Single Image Conversion
+### Docker Deployment
 
 ```bash
-python main.py image.jpg
-python main.py image.jpg -o output.pdf
+# Build the image
+docker build -t doc2pdf-bot .
+
+# Run the bot
+docker run -d \
+  --name doc2pdf-bot \
+  --restart unless-stopped \
+  -e TELEGRAM_BOT_TOKEN=your_token_here \
+  doc2pdf-bot
 ```
 
-#### Multiple Images to Single PDF
+### Docker Compose
 
 ```bash
-python main.py image1.jpg image2.jpg image3.png
+# Copy environment file
+cp .env.example .env
+# Edit .env with your bot token
+
+# Run with Docker Compose
+docker-compose up -d
 ```
 
-#### Batch Directory Conversion
+## 📋 Usage
 
-```bash
-python main.py --batch /path/to/images
-```
+### Basic Commands
 
-#### List Supported Formats
-
-```bash
-python main.py --list-formats
-```
-
-### Telegram Bot Setup
-
-1. **Create a Telegram Bot:**
-   - Message @BotFather on Telegram
-   - Use `/newbot` command
-   - Follow instructions to get your bot token
-
-2. **Configure Environment:**
-
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your bot token
-   ```
-
-3. **Run the Bot:**
-   ```bash
-   python bot_runner.py
-   ```
-
-#### Bot Commands
-
-- `/start` - Start bot and see welcome message
-- `/help` - Show help message
-- `/convert` - Convert received images to PDF
-- `/compress_high` - Set high quality compression (95%) - Best quality
-- `/compress_medium` - Set medium quality compression (85%) - Default
-- `/compress_low` - Set low quality compression (70%) - Smallest file
+- `/start` - Show welcome message and instructions
+- `/help` - Display help information
+- `/convert` - Show compression options for pending images
+- `/convert_now` - Convert images with current settings
+- `/compress_high` - Set high quality (95%) and convert
+- `/compress_medium` - Set medium quality (85%) and convert
+- `/compress_low` - Set low quality (70%) and convert
 - `/clear` - Clear all pending images
 
-#### Bot Usage
+### Workflow
 
-1. Send one or more images to the bot
-2. (Optional) Set compression level with `/compress_high`, `/compress_medium`, or `/compress_low`
-3. Use `/convert` when ready
-4. Download the PDF file with detailed size information
+1. **Send Images**: Send one or more images to the bot
+2. **Choose Compression**: Use `/convert` to see options or set compression directly
+3. **Convert**: Bot automatically converts after setting compression or use `/convert_now`
+4. **Download**: Receive the PDF file with detailed size information
 
-#### Compression Options
+### Compression Options
 
 - **High Quality (95%)**: Best image quality, larger file size
-- **Medium Quality (85%)**: Good balance of quality and size (default)
-- **Low Quality (70%)**: Smallest file size, lower image quality
+- **Medium Quality (85%)**: Good balance, default option
+- **Low Quality (70%)**: Smallest file size, acceptable quality
 
-#### File Size Information
+## 🔧 Configuration
 
-The bot provides detailed file size information:
+### Environment Variables
 
-- Original image size(s)
-- Final PDF size
-- Compression ratio when applicable
-- Image format and dimensions (single images)
-- Number of images (multiple images)
+```bash
+# Required
+TELEGRAM_BOT_TOKEN=your_bot_token_here
 
-## Supported Image Formats
+# Optional
+DEBUG_MODE=false          # Enable debug mode to save PDFs locally
+LOG_LEVEL=INFO           # Logging level (DEBUG, INFO, WARNING, ERROR)
+```
 
-- JPG/JPEG
-- PNG
-- BMP
-- WebP
+### Debug Mode
 
-## Features
+Enable debug mode to save PDF files locally for testing:
 
-- High-quality lossless conversion
-- Single image to PDF
-- Multiple images to single PDF
-- Batch directory processing
-- CLI interface
-- **Telegram bot integration**
-- **PDF compression options** (High/Medium/Low quality)
-- **Detailed file size information**
-- Automatic file cleanup
-- User-friendly interface
+```bash
+DEBUG_MODE=true
+```
 
-## Project Structure
+PDFs will be saved to the `debug_output/` directory.
+
+## 🐳 Docker Configuration
+
+### Dockerfile
+
+The Dockerfile creates a minimal, secure container:
+
+- Based on Python 3.13-slim
+- Non-root user for security
+- Health checks for monitoring
+- Proper signal handling
+
+### Docker Compose
+
+Includes:
+
+- Automatic restart policy
+- Environment variable configuration
+- Volume mounts for debug output
+- Health checks
+
+## 📊 Architecture
+
+### Code Structure
 
 ```
 Doc2Pdf/
-├── requirements.txt          # Python dependencies
-├── image_converter.py        # Core conversion module
-├── main.py                   # CLI application
-├── telegram_bot.py          # Telegram bot implementation
-├── bot_runner.py            # Bot launcher script
-├── .env.example             # Environment configuration template
-├── PROJECT.md               # Project documentation
-└── README.md                # User documentation
+├── telegram_bot.py          # Main bot implementation
+├── bot_runner.py            # Entry point and configuration
+├── image_converter.py       # Core conversion logic
+├── main.py                  # CLI interface
+├── requirements.txt         # Python dependencies
+├── Dockerfile              # Container configuration
+├── docker-compose.yml       # Service orchestration
+├── .env.example            # Environment template
+└── README.md               # This file
 ```
 
-## Docker Deployment
+### Key Classes
 
-### Quick Start with Docker Compose
+- **ImageToPdfBot**: Main bot class with Telegram handlers
+- **ImageToPdfConverter**: Core conversion logic
+- **UserSession**: Manages user-specific data and temporary files
+- **CompressionLevel**: Enum for compression options
+- **MessageTemplates**: Centralized message templates
 
-1. **Clone and setup:**
+## 🔍 Supported Formats
 
-   ```bash
-   git clone https://github.com/hamedafzali/Doc2Pdf.git
-   cd Doc2Pdf
-   ```
+### Input Formats
 
-2. **Configure environment:**
+- **Images**: JPG/JPEG, PNG, BMP, TIFF, GIF, WebP
+- **Documents**: Images sent as document files
 
-   ```bash
-   cp .env.example .env
-   # Edit .env with your bot token
-   ```
+### Output Format
 
-3. **Run with Docker Compose:**
-   ```bash
-   docker-compose up -d
-   ```
+- **PDF**: Standard PDF format with optional compression
 
-### Manual Docker Build
+## 📈 Performance
 
-1. **Build the image:**
+### Optimization Features
 
-   ```bash
-   docker build -t doc2pdf-bot .
-   ```
+- **Efficient Memory Usage**: Automatic cleanup of temporary files
+- **Parallel Processing**: Fast image processing
+- **Smart Compression**: Balance between quality and size
+- **Error Recovery**: Robust error handling
 
-2. **Run the container:**
-   ```bash
-   docker run -d \
-     --name doc2pdf-bot \
-     --restart unless-stopped \
-     -e TELEGRAM_BOT_TOKEN=your_token_here \
-     -e DEBUG_MODE=true \
-     -v $(pwd)/debug_output:/app/debug_output \
-     doc2pdf-bot
-   ```
+### File Size Reduction
 
-### Docker Management
+Typical compression results:
 
-- **View logs:** `docker-compose logs -f`
-- **Stop bot:** `docker-compose down`
-- **Restart bot:** `docker-compose restart`
-- **Debug output:** Check `debug_output/` directory
+- **High Quality**: ~5-15% reduction
+- **Medium Quality**: ~15-30% reduction
+- **Low Quality**: ~30-50% reduction
 
-### Docker Features
+## 🛡️ Security
 
-- **Multi-stage build** for optimized image size
-- **Non-root user** for security
-- **Health checks** for monitoring
-- **Volume mounting** for persistent debug output
-- **Environment variable configuration**
+### Security Features
 
-## Requirements
+- **Non-root Container**: Runs as non-privileged user
+- **Input Validation**: Validates all file types and formats
+- **Temporary File Cleanup**: Automatic cleanup of temporary files
+- **Error Handling**: Prevents information leakage in errors
 
-- Python 3.7+ (for local development)
-- Docker & Docker Compose (for containerized deployment)
-- Telegram Bot Token (for bot functionality)
-- See requirements.txt for package dependencies
+### Best Practices
 
-## Environment Variables
+- Use environment variables for sensitive data
+- Regular updates of dependencies
+- Monitor logs for unusual activity
+- Use HTTPS for web interfaces (if applicable)
 
-- `TELEGRAM_BOT_TOKEN`: Your bot token from @BotFather
-- `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR) - optional
+## 🐛 Troubleshooting
 
-## Development
+### Common Issues
 
-The project is structured with modular components:
+#### Bot Not Responding
 
-- Core conversion logic in `image_converter.py`
-- CLI interface in `main.py`
-- Telegram bot in `telegram_bot.py`
-- Bot launcher in `bot_runner.py`
+```bash
+# Check bot token
+echo $TELEGRAM_BOT_TOKEN
+
+# Check logs
+python bot_runner.py
+
+# Verify bot permissions with @BotFather
+```
+
+#### Conversion Errors
+
+```bash
+# Check supported formats
+python -c "from image_converter import ImageToPdfConverter; print(ImageToPdfConverter().supported_formats)"
+
+# Test conversion manually
+python main.py input.jpg output.pdf
+```
+
+#### Docker Issues
+
+```bash
+# Check container logs
+docker logs doc2pdf-bot
+
+# Check container status
+docker ps
+
+# Restart container
+docker restart doc2pdf-bot
+```
+
+### Debug Mode
+
+Enable debug mode for detailed logging:
+
+```bash
+DEBUG_MODE=true LOG_LEVEL=DEBUG python bot_runner.py
+```
+
+## 📚 API Reference
+
+### Telegram Bot Commands
+
+- **start()**: Handle /start command
+- **help_command()**: Handle /help command
+- **convert_command()**: Show compression options
+- **convert_now_command()**: Convert with current settings
+- **set*compression*\*()**: Set compression levels
+- **handle_image()**: Process image uploads
+- **handle_document()**: Process document uploads
+
+### Core Functions
+
+- **convert_single_image()**: Convert single image to PDF
+- **convert_multiple_images()**: Convert multiple images to PDF
+- **get_image_info()**: Get image metadata
+
+## 🤝 Contributing
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd Doc2Pdf
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up environment
+cp .env.example .env
+# Edit .env with your bot token
+
+# Run tests (if available)
+python -m pytest
+
+# Run bot
+python bot_runner.py
+```
+
+### Code Style
+
+- Follow PEP 8 guidelines
+- Use type hints for functions
+- Add docstrings for all public functions
+- Keep functions small and focused
+- Use meaningful variable names
+
+### Submitting Changes
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🤝 Support
+
+- **Documentation**: Check this README and inline documentation
+- **Issues**: Report bugs and feature requests on GitHub
+- **Community**: Join our Telegram group for discussions
+- **Email**: support@doc2pdf-bot.com
+
+## 🚀 Roadmap
+
+### Upcoming Features
+
+- [ ] Batch processing from URLs
+- [ ] Custom watermarks
+- [ ] PDF password protection
+- [ ] Image preprocessing (rotation, crop)
+- [ ] Multiple language support
+- [ ] Web interface for bot management
+- [ ] Analytics and usage statistics
+- [ ] API rate limiting
+- [ ] User authentication
+- [ ] Custom templates
+
+### Version History
+
+- **v2.0.0** - Refactored codebase with compression options
+- **v1.5.0** - Added multiple image support
+- **v1.0.0** - Initial release with basic conversion
+
+---
+
+**Doc2Pdf Bot** - Fast, reliable image to PDF conversion on Telegram! 📸➡️📄

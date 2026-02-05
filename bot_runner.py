@@ -9,51 +9,42 @@ import sys
 import logging
 from dotenv import load_dotenv
 
-from telegram_bot import create_bot
+# Load environment variables
+load_dotenv()
 
-def setup_logging(log_level: str = "INFO"):
-    """Setup logging configuration"""
-    numeric_level = getattr(logging, log_level.upper(), None)
-    if not isinstance(numeric_level, int):
-        raise ValueError(f'Invalid log level: {log_level}')
-    
-    logging.basicConfig(
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        level=numeric_level
-    )
+# Configure logging
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
 
 def main():
-    """Main bot runner"""
-    # Load environment variables
-    load_dotenv()
+    """Main function to run the bot"""
+    logger.info("Starting Doc2Pdf Telegram Bot...")
     
-    # Get bot token
-    bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-    if not bot_token:
-        print("ERROR: TELEGRAM_BOT_TOKEN not found in environment variables!")
-        print("Please:")
-        print("1. Copy .env.example to .env")
-        print("2. Add your bot token to .env file")
-        print("3. Get token from @BotFather on Telegram")
-        sys.exit(1)
+    # Check required environment variables
+    telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
+    if not telegram_token:
+        logger.error("TELEGRAM_BOT_TOKEN environment variable is required")
+        return
     
-    # Setup logging
-    log_level = os.getenv('LOG_LEVEL', 'INFO')
-    setup_logging(log_level)
-    
-    # Create and run bot
+    # Import and run the refactored bot
     try:
-        print("Starting Image to PDF Telegram Bot...")
-        print(f"Log level: {log_level}")
+        from telegram_bot import create_bot
         
-        bot = create_bot(bot_token)
+        # Create and run bot
+        bot = create_bot(telegram_token)
+        logger.info("Bot started successfully!")
         bot.run()
         
-    except KeyboardInterrupt:
-        print("\nBot stopped by user")
+    except ImportError as e:
+        logger.error(f"Failed to import bot: {e}")
+        logger.error("Make sure all dependencies are installed: pip install -r requirements.txt")
     except Exception as e:
-        print(f"Error starting bot: {e}")
-        sys.exit(1)
+        logger.error(f"Error running bot: {e}")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
