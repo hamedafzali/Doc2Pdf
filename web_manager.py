@@ -21,11 +21,23 @@ app.secret_key = os.urandom(24)
 
 # Docker client
 try:
+    # Try multiple approaches to connect to Docker
     docker_client = docker.from_env()
+    # Test connection
+    docker_client.ping()
     DOCKER_AVAILABLE = True
+    logger.info("Docker client initialized successfully")
 except Exception as e:
     logger.error(f"Docker not available: {e}")
-    DOCKER_AVAILABLE = False
+    # Try alternative connection
+    try:
+        docker_client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
+        docker_client.ping()
+        DOCKER_AVAILABLE = True
+        logger.info("Docker client initialized via unix socket")
+    except Exception as e2:
+        logger.error(f"Docker socket not accessible: {e2}")
+        DOCKER_AVAILABLE = False
 
 # Configuration
 CONTAINER_NAME = "doc2pdf-bot"
