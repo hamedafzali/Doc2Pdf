@@ -4,17 +4,19 @@ services:
     build: .
     container_name: doc2pdf-web-manager
     ports:
-      - "5000:5000"
+      - "0.0.0.0:5000:5000"
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - DEBUG_MODE=${DEBUG_MODE:-false}
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:rw
       - ./debug_output:/app/debug_output
     restart: unless-stopped
     command: python web_manager.py
     networks:
       - doc2pdf-network
+    user: "1000:1000" # Run as appuser but with Docker socket access
 
   # Bot Service (managed by web manager)
   # This will be created/managed by the web interface
