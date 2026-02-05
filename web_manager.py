@@ -20,24 +20,64 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 # Docker client
-try:
-    # Try multiple approaches to connect to Docker
-    docker_client = docker.from_env()
-    # Test connection
-    docker_client.ping()
-    DOCKER_AVAILABLE = True
-    logger.info("Docker client initialized successfully")
-except Exception as e:
-    logger.error(f"Docker not available: {e}")
-    # Try alternative connection
+import os
+import logging
+
+# Configure logging
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+
+# Initialize Docker client with better error handling
+docker_client = None
+DOCKER_AVAILABLE = False
+
+def init_docker_client():
+    """Initialize Docker client with multiple fallback methods"""
+    global docker_client, DOCKER_AVAILABLE
+    
     try:
-        docker_client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
+        # Method 1: Try environment variables
+        logger.info("Attempting Docker connection via environment variables...")
+        docker_client = docker.from_env()
         docker_client.ping()
         DOCKER_AVAILABLE = True
-        logger.info("Docker client initialized via unix socket")
-    except Exception as e2:
-        logger.error(f"Docker socket not accessible: {e2}")
-        DOCKER_AVAILABLE = False
+        logger.info("Docker client initialized successfully via environment")
+        return
+    except Exception as e:
+        logger.warning(f"Environment method failed: {e}")
+        
+        try:
+            # Method 2: Try direct unix socket
+            logger.info("Attempting Docker connection via unix socket...")
+            docker_client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
+            docker_client.ping()
+            DOCKER_AVAILABLE = True
+            logger.info("Docker client initialized via unix socket")
+            return
+        except Exception as e2:
+            logger.warning(f"Unix socket method failed: {e2}")
+            
+            try:
+                # Method 3: Try TCP connection
+                logger.info("Attempting Docker connection via TCP...")
+                docker_client = docker.DockerClient(base_url='tcp://localhost:2376')
+                docker_client.ping()
+                DOCKER_AVAILABLE = True
+                logger.info("Docker client initialized via TCP")
+                return
+            except Exception as e3:
+                logger.error(f"TCP method failed: {e3}")
+                DOCKER_AVAILABLE = False
+                logger.error("All Docker connection methods failed")
+                return
+
+# Initialize Docker client
+init_docker_client()
 
 # Configuration
 CONTAINER_NAME = "doc2pdf-bot"
