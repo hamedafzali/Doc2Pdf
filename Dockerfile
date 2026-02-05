@@ -23,6 +23,8 @@ RUN mkdir -p debug_output && chmod 777 debug_output
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser && \
+    groupadd -g docker docker || true && \
+    usermod -aG docker appuser && \
     chown -R appuser:appuser /app && \
     chmod 755 /app
 
