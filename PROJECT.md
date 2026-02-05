@@ -22,18 +22,288 @@ A Python application that converts images to PDF format with support for both st
 
 ```
 Doc2Pdf/
-├── requirements.txt          # Python dependencies
-├── image_converter.py        # Core conversion module
-├── main.py                   # CLI application
-├── telegram_bot.py          # Telegram bot implementation
-├── bot_runner.py            # Bot launcher script
-├── Dockerfile               # Docker container configuration
-├── docker-compose.yml       # Docker Compose configuration
-├── .dockerignore            # Docker ignore file
-├── .env.example             # Environment configuration template
-├── PROJECT.md               # Project documentation
-└── README.md                # User documentation
+├── Core Application
+│   ├── image_converter.py      # Core PDF conversion logic
+│   ├── telegram_bot.py         # Telegram bot interface
+│   ├── main.py                # CLI interface
+│   └── bot_runner.py           # Bot entry point
+├── Web Management Interface
+│   ├── web_manager.py          # Flask web application
+│   ├── web_runner.py           # Web manager entry point
+│   ├── templates/              # HTML templates
+│   │   ├── dashboard.html       # Main management UI
+│   │   └── logs.html          # Logs viewer UI
+│   └── static/
+│       └── js/
+│           ├── dashboard.js       # Dashboard functionality
+│           └── logs.js           # Logs functionality
+├── Docker & Deployment
+│   ├── Dockerfile              # Container definition
+│   ├── docker-compose.yml       # Bot deployment
+│   └── docker-compose-manager.yml # Web manager deployment
+├── Configuration
+│   ├── .env.example           # Environment template
+│   ├── .dockerignore           # Docker ignore rules
+│   └── requirements.txt        # Python dependencies
+└── Documentation
+    ├── PROJECT.md              # This file
+    ├── README.md               # User guide
+    └── WEB_MANAGER_README.md    # Web manager guide
 ```
+
+## How It Works
+
+### 🔄 Complete System Architecture
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Telegram      │    │   Web Manager    │    │     Docker      │
+│     Bot         │◄──►│   Interface      │◄──►│   Container     │
+│                 │    │                  │    │                 │
+│ • Image to PDF  │    │ • Start/Stop     │    │ • Bot Process   │
+│ • Compression   │    │ • Logs View      │    │ • File System   │
+│ • File Info     │    │ • Rebuild        │    │ • Networking    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         ▲                        ▲                        ▲
+         │                        │                        │
+         └────────────────────────┴────────────────────────┘
+                            User Interaction
+```
+
+### 📱 User Interaction Flow
+
+#### **1. Telegram Bot Flow**
+
+```
+User sends images → Bot stores temporarily → User chooses compression → Bot converts → Returns PDF + file info
+```
+
+#### **2. Web Manager Flow**
+
+```
+Admin accesses web UI → View container status → Control bot → Monitor logs → Rebuild if needed
+```
+
+### 🏗️ Component Breakdown
+
+#### **Core Components**
+
+**1. image_converter.py**
+
+- **Purpose**: Core PDF conversion engine
+- **Key Classes**: `ImageToPdfConverter`
+- **Features**:
+  - Single/multiple image conversion
+  - Compression (High/Medium/Low quality)
+  - File size calculation and formatting
+  - Image information extraction
+- **Dependencies**: Pillow, img2pdf, io
+
+**2. telegram_bot.py**
+
+- **Purpose**: Telegram bot interface
+- **Key Classes**: `ImageToPdfBot`
+- **Features**:
+  - Image/document handling
+  - Interactive compression selection
+  - File size information display
+  - User session management
+- **Dependencies**: python-telegram-bot, logging
+
+**3. main.py**
+
+- **Purpose**: Command-line interface
+- **Features**:
+  - Single image conversion
+  - Batch directory processing
+  - CLI arguments and options
+
+#### **Web Management Components**
+
+**4. web_manager.py**
+
+- **Purpose**: Flask web application for bot management
+- **Key Classes**: `BotManager`
+- **Features**:
+  - Docker container control
+  - Real-time status monitoring
+  - Log streaming
+  - Image rebuilding
+- **Dependencies**: Flask, docker-py
+
+**5. Web UI Components**
+
+- **dashboard.html**: Main management interface
+- **logs.html**: Real-time log viewer
+- **JavaScript files**: Interactive functionality and API calls
+
+#### **Deployment Components**
+
+**6. Docker Configuration**
+
+- **Dockerfile**: Multi-purpose container image
+- **docker-compose.yml**: Bot deployment
+- **docker-compose-manager.yml**: Web manager deployment
+
+### 🔄 Data Flow
+
+#### **Telegram Bot Processing**
+
+```
+1. User sends image(s) via Telegram
+2. Bot downloads to temporary storage
+3. User triggers /convert command
+4. Bot shows compression options menu
+5. User selects compression level
+6. Bot processes images with compression
+7. Bot generates PDF with file size info
+8. Bot sends PDF + detailed information
+9. Bot cleans up temporary files
+```
+
+#### **Web Manager Operations**
+
+```
+1. Admin accesses web interface (port 5000)
+2. Web app connects to Docker socket
+3. Admin views container status (real-time)
+4. Admin performs actions (start/stop/restart)
+5. Web app manages Docker containers
+6. Admin views real-time logs
+7. Admin can rebuild image if needed
+```
+
+### 🔧 Configuration System
+
+#### **Environment Variables**
+
+```bash
+# Core Configuration
+TELEGRAM_BOT_TOKEN=token    # Bot authentication
+LOG_LEVEL=INFO             # Logging verbosity
+DEBUG_MODE=false           # File retention for debugging
+
+# Web Manager Configuration
+WEB_MANAGER_HOST=0.0.0.0   # Web server binding
+WEB_MANAGER_PORT=5000       # Web server port
+WEB_MANAGER_DEBUG=false      # Flask debug mode
+```
+
+#### **Compression Settings**
+
+```python
+COMPRESSION_QUALITY = {
+    'high': 95,    # Best quality, larger files
+    'medium': 85,  # Good balance (default)
+    'low': 70      # Smallest files, lower quality
+}
+```
+
+### 🐳 Container Architecture
+
+#### **Multi-Mode Container**
+
+The single Docker image can run in two modes:
+
+1. **Bot Mode** (default):
+
+   ```bash
+   docker run doc2pdf-bot python bot_runner.py
+   ```
+
+2. **Web Manager Mode**:
+   ```bash
+   docker run doc2pdf-bot python web_runner.py
+   ```
+
+#### **Docker Socket Integration**
+
+```
+Web Manager Container
+       │
+       ▼
+/var/run/docker.sock (mounted)
+       │
+       ▼
+Docker Daemon
+       │
+       ▼
+Bot Container (managed)
+```
+
+### 📊 State Management
+
+#### **Bot State**
+
+- **User Sessions**: Temporary files per user
+- **Compression Settings**: Per-user preferences
+- **File Cleanup**: Automatic after conversion
+
+#### **Web Manager State**
+
+- **Container Status**: Real-time monitoring
+- **Log Streaming**: Live from Docker API
+- **Auto-refresh**: 5-second intervals
+
+### 🔒 Security Architecture
+
+#### **Isolation**
+
+- **Bot Container**: Runs as non-root user
+- **Web Manager**: Limited Docker socket access
+- **File System**: Proper permissions and cleanup
+
+#### **Data Flow Security**
+
+```
+Telegram → Bot (encrypted) → Temp Files → PDF → User (encrypted)
+Web UI → HTTPS (recommended) → Docker API → Container Control
+```
+
+### 🚀 Deployment Scenarios
+
+#### **1. Bot Only Deployment**
+
+```bash
+docker-compose up -d
+# Runs bot container only
+# Bot accessible via Telegram
+```
+
+#### **2. Web Manager Deployment**
+
+```bash
+docker-compose -f docker-compose-manager.yml up -d
+# Runs web manager container
+# Bot managed via web interface
+# Access at http://server:5000
+```
+
+#### **3. Development Mode**
+
+```bash
+pip install -r requirements.txt
+python bot_runner.py  # or web_runner.py
+# Local development with hot reload
+```
+
+### 📈 Monitoring & Logging
+
+#### **Log Levels**
+
+- **DEBUG**: Detailed processing information
+- **INFO**: General operation status
+- **WARNING**: Non-critical issues
+- **ERROR**: Critical failures
+
+#### **Metrics Tracked**
+
+- **File sizes**: Before/after compression
+- **Conversion times**: Performance monitoring
+- **User actions**: Bot interaction patterns
+- **Container health**: Docker status checks
+
+This architecture provides a complete, scalable solution for image-to-PDF conversion with professional management capabilities.
 
 ## Dependencies
 
