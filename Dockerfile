@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir -p debug_output && chmod 777 debug_output
 
 # Create non-root user for security
-RUN groupadd -r -g docker docker || true && \
+RUN groupadd -r docker || true && \
     useradd --create-home --shell /bin/bash -G docker appuser && \
     chown -R appuser:appuser /app && \
     chmod 755 /app

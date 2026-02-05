@@ -17,6 +17,8 @@ A Python application that converts images to PDF format with support for both st
 
 ✅ Core image conversion functionality implemented
 ✅ CLI interface created
+✅ Telegram bot with interactive compression
+✅ Web-based management interface (separated)
 
 ## Project Structure
 
@@ -27,29 +29,53 @@ Doc2Pdf/
 │   ├── telegram_bot.py         # Telegram bot interface
 │   ├── main.py                # CLI interface
 │   └── bot_runner.py           # Bot entry point
-├── Web Management Interface
-│   ├── web_manager.py          # Flask web application
-│   ├── web_runner.py           # Web manager entry point
-│   ├── templates/              # HTML templates
-│   │   ├── dashboard.html       # Main management UI
-│   │   └── logs.html          # Logs viewer UI
-│   └── static/
-│       └── js/
-│           ├── dashboard.js       # Dashboard functionality
-│           └── logs.js           # Logs functionality
+├── Web Management Interface (Separated)
+│   └── See: https://github.com/hamedafzali/AdvancedContainerManager
 ├── Docker & Deployment
 │   ├── Dockerfile              # Container definition
-│   ├── docker-compose.yml       # Bot deployment
-│   └── docker-compose-manager.yml # Web manager deployment
+│   └── docker-compose.yml       # Bot deployment
 ├── Configuration
 │   ├── .env.example           # Environment template
-│   ├── .dockerignore           # Docker ignore rules
 │   └── requirements.txt        # Python dependencies
 └── Documentation
     ├── PROJECT.md              # This file
-    ├── README.md               # User guide
-    └── WEB_MANAGER_README.md    # Web manager guide
+    └── README.md               # User documentation
 ```
+
+## Container Management
+
+The web-based container management interface has been separated into its own repository:
+
+### 🚀 Advanced Container Manager
+
+**Repository**: https://github.com/hamedafzali/AdvancedContainerManager
+
+**Features**:
+
+- Professional web-based container management
+- Real-time metrics and monitoring
+- Web terminal access inside containers
+- Multi-project Git repository management
+- Modern UI with real-time updates
+- REST API for all operations
+
+**Quick Start**:
+
+```bash
+git clone https://github.com/hamedafzali/AdvancedContainerManager
+cd AdvancedContainerManager
+pip install -r requirements.txt
+python advanced_manager.py
+```
+
+**Access**: http://localhost:5003
+
+### 📋 Separation Benefits
+
+- **Focused Development**: Each repository has a clear purpose
+- **Independent Updates**: Manager can be updated without affecting bot
+- **Reusable**: Manager can manage other projects, not just Doc2Pdf
+- **Professional**: Enterprise-grade container management platform
 
 ## How It Works
 
