@@ -567,7 +567,7 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("convert_now", self.convert_now_command))
         application.add_handler(CommandHandler("compress_high", self.set_compression_high))
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
-        application.add_handler(CommandHandler("compress_low", set_compression_low))
+        application.add_handler(CommandHandler("compress_low", self.set_compression_low))
         
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
