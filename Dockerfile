@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libffi-dev \
     libssl-dev \
+    libreoffice \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy application files

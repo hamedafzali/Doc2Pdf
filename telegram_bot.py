@@ -19,6 +19,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ParseMode
 
 from image_converter import ImageToPdfConverter
+from document_converter import DocumentToPdfConverter
 
 # Configure logging
 logging.basicConfig(
@@ -117,6 +118,7 @@ Welcome! I can convert your images to PDF format.
 **Features:**
 • Convert single images to PDF
 • Combine multiple images into one PDF
+• Convert Office docs to PDF (DOCX, PPTX, XLSX)
 • **NEW:** PDF compression options
 • Supports: JPG, PNG, BMP, TIFF, GIF, WebP
 
@@ -156,6 +158,7 @@ Send me some images to get started! 📸
 • TIFF
 • GIF
 • WebP
+• DOCX, PPTX, XLSX
 
 **Compression Options:**
 • /compress_high - Best quality (95%) - Larger files
@@ -273,6 +276,25 @@ Send me some images to get started! 📸
             f"❌ Unsupported format: {file_extension}\n"
             f"Supported formats: {', '.join(supported_formats)}"
         )
+
+    @staticmethod
+    def document_received(file_name: str) -> str:
+        """Document received message"""
+        return f"✅ Document received: {file_name}\nConverting to PDF..."
+
+    @staticmethod
+    def document_success(original_size: str, pdf_size: str) -> str:
+        """Document conversion success message"""
+        return (
+            "✅ Document converted to PDF!\n"
+            f"📄 Original: {original_size}\n"
+            f"📄 PDF: {pdf_size}"
+        )
+
+    @staticmethod
+    def document_error(error_message: str) -> str:
+        """Document conversion error message"""
+        return f"❌ Document conversion failed: {error_message}"
     
     @staticmethod
     def files_cleared() -> str:
@@ -291,6 +313,7 @@ class ImageToPdfBot:
     def __init__(self, token: str):
         self.token = token
         self.converter = ImageToPdfConverter()
+        self.doc_converter = DocumentToPdfConverter()
         self.user_sessions: Dict[int, UserSession] = {}
         self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
         self.debug_dir = 'debug_output'
@@ -529,6 +552,47 @@ class ImageToPdfBot:
                 # Clean up invalid file
                 os.unlink(temp_file.name)
                 session.temp_files.remove(temp_file.name)
+
+    async def handle_office_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle Office document uploads (DOCX, PPTX, XLSX)"""
+        document = update.message.document
+
+        if not document or not document.file_name:
+            await update.message.reply_text("❌ Invalid document.")
+            return
+
+        file_extension = Path(document.file_name).suffix.lower()
+        if file_extension not in self.doc_converter.supported_formats:
+            await update.message.reply_text(
+                MessageTemplates.unsupported_format(file_extension, list(self.doc_converter.supported_formats))
+            )
+            return
+
+        await update.message.reply_text(MessageTemplates.document_received(document.file_name))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            doc_path = os.path.join(temp_dir, document.file_name)
+            file = await context.bot.get_file(document.file_id)
+            await file.download_to_drive(doc_path)
+
+            try:
+                output_pdf = os.path.join(temp_dir, f"{Path(document.file_name).stem}.pdf")
+                result = self.doc_converter.convert_document(doc_path, output_pdf)
+                original_size = self.converter.format_file_size(result["original_size"])
+                pdf_size = self.converter.format_file_size(result["pdf_size"])
+
+                await update.message.reply_document(
+                    document=open(result["pdf_path"], "rb"),
+                    caption="✅ Document converted to PDF!",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                await update.message.reply_text(
+                    MessageTemplates.document_success(original_size, pdf_size),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                logger.error(f"Error converting document: {e}")
+                await update.message.reply_text(MessageTemplates.document_error(str(e)))
     
     def _get_image_info(self, image_path: str) -> Optional[ImageInfo]:
         """Get image information"""
@@ -572,6 +636,7 @@ class ImageToPdfBot:
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
         application.add_handler(MessageHandler(filters.Document.IMAGE, self.handle_document))
+        application.add_handler(MessageHandler(filters.Document.ALL & ~filters.Document.IMAGE, self.handle_office_document))
         
         # Error handler
         application.add_error_handler(self.error_handler)
