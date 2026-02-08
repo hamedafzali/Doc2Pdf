@@ -251,8 +251,11 @@ class MessageTemplates:
     }
 
     @classmethod
-    def get(cls, key: str, lang: Language) -> str:
-        return cls.STRINGS.get(key, {}).get(lang) or cls.STRINGS.get(key, {}).get(Language.EN, "")
+    def t(cls, key: str, lang: Language, **kwargs) -> str:
+        text = cls.STRINGS.get(key, {}).get(lang) or cls.STRINGS.get(key, {}).get(Language.EN, "")
+        if kwargs:
+            return text.format(**kwargs)
+        return text
     
     @staticmethod
     def compression_options(image_count: int, current_setting: CompressionLevel) -> str:
@@ -358,29 +361,9 @@ class MessageTemplates:
         return f"❌ Document conversion failed: {error_message}"
     
     @staticmethod
-    def files_cleared() -> str:
-        """Files cleared message"""
-        return "🗑️ Cleared all pending files!"
-
-    @staticmethod
     def pdf_received(file_name: str, pending_count: int) -> str:
         """PDF received message"""
         return f"✅ PDF received: {file_name}\nPDFs pending: {pending_count}\nUse /merge or /split."
-
-    @staticmethod
-    def no_pdfs() -> str:
-        """No PDFs message"""
-        return "❌ No PDFs pending. Send PDF files first."
-
-    @staticmethod
-    def url_usage() -> str:
-        """URL usage message"""
-        return "Usage: /url2pdf https://example.com"
-
-    @staticmethod
-    def ocr_usage() -> str:
-        """OCR usage message"""
-        return "Usage: /ocr [language]\nExample: /ocr eng"
     
     @staticmethod
     def compression_set(compression: CompressionLevel) -> str:
@@ -418,7 +401,7 @@ class ImageToPdfBot:
         """Handle /start command"""
         session = self.get_user_session(update.effective_user.id)
         await update.message.reply_text(
-            MessageTemplates.get("welcome", session.language),
+            MessageTemplates.t("welcome", session.language),
             parse_mode=ParseMode.MARKDOWN
         )
     
@@ -426,7 +409,7 @@ class ImageToPdfBot:
         """Handle /help command"""
         session = self.get_user_session(update.effective_user.id)
         await update.message.reply_text(
-            MessageTemplates.get("help", session.language),
+            MessageTemplates.t("help", session.language),
             parse_mode=ParseMode.MARKDOWN
         )
     
@@ -435,23 +418,23 @@ class ImageToPdfBot:
         session = self.get_user_session(update.effective_user.id)
         session.clear_temp_files()
         session.clear_pdf_files()
-        await update.message.reply_text(MessageTemplates.get("files_cleared", session.language))
+        await update.message.reply_text(MessageTemplates.t("files_cleared", session.language))
 
     async def set_language_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Set user language"""
         session = self.get_user_session(update.effective_user.id)
         if not context.args:
-            await update.message.reply_text(MessageTemplates.get("lang_usage", session.language))
+            await update.message.reply_text(MessageTemplates.t("lang_usage", session.language))
             return
 
         lang_arg = context.args[0].lower()
         lang_map = {"en": Language.EN, "de": Language.DE, "fa": Language.FA}
         if lang_arg not in lang_map:
-            await update.message.reply_text(MessageTemplates.get("lang_usage", session.language))
+            await update.message.reply_text(MessageTemplates.t("lang_usage", session.language))
             return
 
         session.language = lang_map[lang_arg]
-        await update.message.reply_text(MessageTemplates.get("lang_set", session.language))
+        await update.message.reply_text(MessageTemplates.t("lang_set", session.language))
     
     async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
         """Set compression level and convert"""
@@ -539,7 +522,7 @@ class ImageToPdfBot:
         """Merge all pending PDFs into one"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
+            await update.message.reply_text(MessageTemplates.t("no_pdfs", session.language))
             return
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -561,7 +544,7 @@ class ImageToPdfBot:
         """Split the last received PDF into one file per page"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
+            await update.message.reply_text(MessageTemplates.t("no_pdfs", session.language))
             return
 
         source_pdf = session.pdf_files[-1]
@@ -585,7 +568,7 @@ class ImageToPdfBot:
         """Compress the last received PDF"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
+            await update.message.reply_text(MessageTemplates.t("no_pdfs", session.language))
             return
 
         source_pdf = session.pdf_files[-1]
@@ -608,7 +591,7 @@ class ImageToPdfBot:
         """Convert a URL to PDF"""
         if not context.args:
             session = self.get_user_session(update.effective_user.id)
-            await update.message.reply_text(MessageTemplates.get("url_usage", session.language))
+            await update.message.reply_text(MessageTemplates.t("url_usage", session.language))
             return
 
         url = context.args[0]
@@ -629,7 +612,7 @@ class ImageToPdfBot:
         """Run OCR on the last received PDF"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
+            await update.message.reply_text(MessageTemplates.t("no_pdfs", session.language))
             return
 
         language = "eng"
