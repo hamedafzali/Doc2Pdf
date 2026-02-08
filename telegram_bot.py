@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from telegram import Update, BotCommand, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, BotCommand, InlineKeyboardMarkup, InlineKeyboardButton, BotCommandScopeChat
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
@@ -104,6 +104,11 @@ class ImageToPdfBot:
             return
 
         session.language = lang_map[lang_arg]
+        # Clear any chat-scoped commands so global (English) menu shows
+        try:
+            await context.bot.delete_my_commands(scope=BotCommandScopeChat(update.effective_chat.id))
+        except Exception:
+            pass
         await update.message.reply_text(MessageTemplates.t("lang_set", session.language))
 
     async def handle_lang_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -125,6 +130,11 @@ class ImageToPdfBot:
             return
 
         session.language = lang_map[lang_code]
+        # Clear any chat-scoped commands so global (English) menu shows
+        try:
+            await context.bot.delete_my_commands(scope=BotCommandScopeChat(query.message.chat_id))
+        except Exception:
+            pass
         await query.edit_message_text(MessageTemplates.t("lang_set", session.language))
     
     async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
