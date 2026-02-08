@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     fonts-dejavu-core \
     wkhtmltopdf \
     qpdf \
+    tesseract-ocr \
+    ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy application files

@@ -167,6 +167,7 @@ Welcome! I can convert your images to PDF format.
 /split - Split the last PDF (one per page)
 /compress_pdf - Compress the last PDF
 /url2pdf - Convert a URL to PDF
+/ocr - Make the last PDF searchable
 /clear - Clear pending images
 
 Send me some images to get started! 📸
@@ -216,6 +217,7 @@ Send me some images to get started! 📸
 /split - Split the last PDF (one per page)
 /compress_pdf - Compress the last PDF
 /url2pdf - Convert a URL to PDF
+/ocr - Make the last PDF searchable
 /clear - Clear all pending images
 /help - Show this help message
 
@@ -348,6 +350,11 @@ Send me some images to get started! 📸
     def url_usage() -> str:
         """URL usage message"""
         return "Usage: /url2pdf https://example.com"
+
+    @staticmethod
+    def ocr_usage() -> str:
+        """OCR usage message"""
+        return "Usage: /ocr [language]\nExample: /ocr eng"
     
     @staticmethod
     def compression_set(compression: CompressionLevel) -> str:
@@ -566,6 +573,33 @@ class ImageToPdfBot:
             except Exception as e:
                 logger.error(f"Error converting URL: {e}")
                 await update.message.reply_text(f"❌ URL conversion failed: {e}")
+
+    async def ocr_pdf_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Run OCR on the last received PDF"""
+        session = self.get_user_session(update.effective_user.id)
+        if not session.get_pdf_count():
+            await update.message.reply_text(MessageTemplates.no_pdfs())
+            return
+
+        language = "eng"
+        if context.args:
+            language = context.args[0]
+
+        source_pdf = session.pdf_files[-1]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "ocr.pdf")
+            try:
+                ocr_path = self.pdf_tools.ocr_pdf(source_pdf, output_path, language=language)
+                await update.message.reply_document(
+                    document=open(ocr_path, "rb"),
+                    caption="✅ OCR completed!",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                logger.error(f"Error running OCR: {e}")
+                await update.message.reply_text(f"❌ OCR failed: {e}")
+            finally:
+                session.clear_pdf_files()
     
     async def _convert_single_image(self, image_path: str, output_path: Optional[str] = None, compress: CompressionLevel = CompressionLevel.MEDIUM) -> ConversionResult:
         """Convert single image to PDF"""
@@ -805,6 +839,7 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("split", self.split_pdf_command))
         application.add_handler(CommandHandler("compress_pdf", self.compress_pdf_command))
         application.add_handler(CommandHandler("url2pdf", self.url_to_pdf_command))
+        application.add_handler(CommandHandler("ocr", self.ocr_pdf_command))
         
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
@@ -828,6 +863,7 @@ class ImageToPdfBot:
             BotCommand("split", "Split last PDF into pages"),
             BotCommand("compress_pdf", "Compress last PDF"),
             BotCommand("url2pdf", "Convert URL to PDF"),
+            BotCommand("ocr", "OCR last PDF"),
             BotCommand("clear", "Clear all pending images")
         ]
         

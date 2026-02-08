@@ -3,6 +3,8 @@ PDF utilities: merge and split.
 """
 
 import os
+import shutil
+import subprocess
 from typing import List, Optional, Tuple
 
 from pypdf import PdfReader, PdfWriter
@@ -41,6 +43,31 @@ class PdfTools:
 
         with pikepdf.open(pdf_path) as pdf:
             pdf.save(output_path, optimize_streams=True, compress_streams=True)
+
+        return output_path
+
+    def ocr_pdf(self, pdf_path: str, output_path: Optional[str] = None, language: str = "eng") -> str:
+        if not os.path.exists(pdf_path):
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
+        if output_path is None:
+            base = os.path.splitext(os.path.basename(pdf_path))[0]
+            output_path = f"{base}_ocr.pdf"
+
+        ocrmypdf_path = shutil.which("ocrmypdf")
+        if not ocrmypdf_path:
+            raise RuntimeError("ocrmypdf not found. Install it to enable OCR.")
+
+        cmd = [
+            ocrmypdf_path,
+            "--force-ocr",
+            "--language", language,
+            pdf_path,
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "OCR failed")
 
         return output_path
 
