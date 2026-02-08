@@ -21,6 +21,7 @@ from telegram.constants import ParseMode
 from image_converter import ImageToPdfConverter
 from document_converter import DocumentToPdfConverter
 from text_converter import TextToPdfConverter
+from pdf_tools import PdfTools
 
 # Configure logging
 logging.basicConfig(
@@ -85,6 +86,7 @@ class UserSession:
         self.user_id = user_id
         self.temp_files: List[str] = []
         self.compression_setting: CompressionLevel = CompressionLevel.MEDIUM
+        self.pdf_files: List[str] = []
         
     def add_temp_file(self, file_path: str):
         """Add temporary file to session"""
@@ -99,6 +101,23 @@ class UserSession:
             except Exception as e:
                 logger.error(f"Error cleaning up file {file_path}: {e}")
         self.temp_files.clear()
+
+    def add_pdf_file(self, file_path: str):
+        """Add PDF file to session"""
+        self.pdf_files.append(file_path)
+
+    def clear_pdf_files(self):
+        """Clean up all pending PDF files"""
+        for file_path in self.pdf_files:
+            try:
+                os.unlink(file_path)
+            except Exception:
+                pass
+        self.pdf_files.clear()
+
+    def get_pdf_count(self) -> int:
+        """Get number of pending PDFs"""
+        return len(self.pdf_files)
     
     def get_file_count(self) -> int:
         """Get number of pending files"""
@@ -142,6 +161,8 @@ Welcome! I can convert your images to PDF format.
 /compress_high - Set high quality compression (95%)
 /compress_medium - Set medium quality compression (85%) - Default
 /compress_low - Set low quality compression (70%) - Smallest file
+/merge - Merge pending PDFs
+/split - Split the last PDF (one per page)
 /clear - Clear pending images
 
 Send me some images to get started! 📸
@@ -186,6 +207,8 @@ Send me some images to get started! 📸
 /compress_high - Set high quality compression
 /compress_medium - Set medium quality compression
 /compress_low - Set low quality compression
+/merge - Merge pending PDFs
+/split - Split the last PDF (one per page)
 /clear - Clear all pending images
 /help - Show this help message
 
@@ -302,7 +325,17 @@ Send me some images to get started! 📸
     @staticmethod
     def files_cleared() -> str:
         """Files cleared message"""
-        return "🗑️ Cleared all pending images!"
+        return "🗑️ Cleared all pending files!"
+
+    @staticmethod
+    def pdf_received(file_name: str, pending_count: int) -> str:
+        """PDF received message"""
+        return f"✅ PDF received: {file_name}\nPDFs pending: {pending_count}\nUse /merge or /split."
+
+    @staticmethod
+    def no_pdfs() -> str:
+        """No PDFs message"""
+        return "❌ No PDFs pending. Send PDF files first."
     
     @staticmethod
     def compression_set(compression: CompressionLevel) -> str:
@@ -318,6 +351,7 @@ class ImageToPdfBot:
         self.converter = ImageToPdfConverter()
         self.doc_converter = DocumentToPdfConverter()
         self.text_converter = TextToPdfConverter()
+        self.pdf_tools = PdfTools()
         self.user_sessions: Dict[int, UserSession] = {}
         self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
         self.debug_dir = 'debug_output'
@@ -346,6 +380,7 @@ class ImageToPdfBot:
         """Handle /clear command"""
         session = self.get_user_session(update.effective_user.id)
         session.clear_temp_files()
+        session.clear_pdf_files()
         await update.message.reply_text(MessageTemplates.files_cleared())
     
     async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
@@ -429,6 +464,52 @@ class ImageToPdfBot:
         finally:
             # Clean up temporary files
             session.clear_temp_files()
+
+    async def merge_pdfs_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Merge all pending PDFs into one"""
+        session = self.get_user_session(update.effective_user.id)
+        if not session.get_pdf_count():
+            await update.message.reply_text(MessageTemplates.no_pdfs())
+            return
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "merged.pdf")
+            try:
+                merged_path = self.pdf_tools.merge_pdfs(session.pdf_files, output_path)
+                await update.message.reply_document(
+                    document=open(merged_path, "rb"),
+                    caption="✅ PDFs merged successfully!",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                logger.error(f"Error merging PDFs: {e}")
+                await update.message.reply_text(f"❌ Merge failed: {e}")
+            finally:
+                session.clear_pdf_files()
+
+    async def split_pdf_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Split the last received PDF into one file per page"""
+        session = self.get_user_session(update.effective_user.id)
+        if not session.get_pdf_count():
+            await update.message.reply_text(MessageTemplates.no_pdfs())
+            return
+
+        source_pdf = session.pdf_files[-1]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_prefix = os.path.join(temp_dir, "split")
+            try:
+                outputs = self.pdf_tools.split_pdf(source_pdf, output_prefix=output_prefix)
+                for out_path in outputs:
+                    await update.message.reply_document(
+                        document=open(out_path, "rb"),
+                        caption="✅ Split page",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+            except Exception as e:
+                logger.error(f"Error splitting PDF: {e}")
+                await update.message.reply_text(f"❌ Split failed: {e}")
+            finally:
+                session.clear_pdf_files()
     
     async def _convert_single_image(self, image_path: str, output_path: Optional[str] = None, compress: CompressionLevel = CompressionLevel.MEDIUM) -> ConversionResult:
         """Convert single image to PDF"""
@@ -566,6 +647,17 @@ class ImageToPdfBot:
             return
 
         file_extension = Path(document.file_name).suffix.lower()
+        if file_extension == ".pdf":
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                file = await context.bot.get_file(document.file_id)
+                await file.download_to_drive(temp_file.name)
+                session = self.get_user_session(update.effective_user.id)
+                session.add_pdf_file(temp_file.name)
+                await update.message.reply_text(
+                    MessageTemplates.pdf_received(document.file_name, session.get_pdf_count())
+                )
+            return
+
         converter = None
         if file_extension in self.doc_converter.supported_formats:
             converter = self.doc_converter
@@ -645,6 +737,8 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("compress_high", self.set_compression_high))
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
         application.add_handler(CommandHandler("compress_low", self.set_compression_low))
+        application.add_handler(CommandHandler("merge", self.merge_pdfs_command))
+        application.add_handler(CommandHandler("split", self.split_pdf_command))
         
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
@@ -664,6 +758,8 @@ class ImageToPdfBot:
             BotCommand("compress_high", "Set high quality compression (95%)"),
             BotCommand("compress_medium", "Set medium quality compression (85%)"),
             BotCommand("compress_low", "Set low quality compression (70%)"),
+            BotCommand("merge", "Merge pending PDFs"),
+            BotCommand("split", "Split last PDF into pages"),
             BotCommand("clear", "Clear all pending images")
         ]
         
