@@ -29,6 +29,21 @@ class PdfTools:
 
         return output_path
 
+    def compress_pdf(self, pdf_path: str, output_path: Optional[str] = None) -> str:
+        if not os.path.exists(pdf_path):
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
+        if output_path is None:
+            base = os.path.splitext(os.path.basename(pdf_path))[0]
+            output_path = f"{base}_compressed.pdf"
+
+        import pikepdf
+
+        with pikepdf.open(pdf_path) as pdf:
+            pdf.save(output_path, optimize_streams=True, compress_streams=True)
+
+        return output_path
+
     def split_pdf(self, pdf_path: str, page_ranges: Optional[List[Tuple[int, int]]] = None,
                   output_prefix: Optional[str] = None) -> List[str]:
         if not os.path.exists(pdf_path):

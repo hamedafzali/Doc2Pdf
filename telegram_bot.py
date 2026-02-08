@@ -22,6 +22,7 @@ from image_converter import ImageToPdfConverter
 from document_converter import DocumentToPdfConverter
 from text_converter import TextToPdfConverter
 from pdf_tools import PdfTools
+from html_converter import HtmlToPdfConverter
 
 # Configure logging
 logging.basicConfig(
@@ -140,6 +141,7 @@ Welcome! I can convert your images to PDF format.
 • Combine multiple images into one PDF
 • Convert Office docs to PDF (DOCX, PPTX, XLSX)
 • Convert text/markdown to PDF (TXT, MD)
+• Convert HTML/URL to PDF
 • **NEW:** PDF compression options
 • Supports: JPG, PNG, BMP, TIFF, GIF, WebP
 
@@ -163,6 +165,8 @@ Welcome! I can convert your images to PDF format.
 /compress_low - Set low quality compression (70%) - Smallest file
 /merge - Merge pending PDFs
 /split - Split the last PDF (one per page)
+/compress_pdf - Compress the last PDF
+/url2pdf - Convert a URL to PDF
 /clear - Clear pending images
 
 Send me some images to get started! 📸
@@ -183,6 +187,7 @@ Send me some images to get started! 📸
 • WebP
 • DOCX, PPTX, XLSX
 • TXT, MD
+• HTML, HTM
 
 **Compression Options:**
 • /compress_high - Best quality (95%) - Larger files
@@ -209,6 +214,8 @@ Send me some images to get started! 📸
 /compress_low - Set low quality compression
 /merge - Merge pending PDFs
 /split - Split the last PDF (one per page)
+/compress_pdf - Compress the last PDF
+/url2pdf - Convert a URL to PDF
 /clear - Clear all pending images
 /help - Show this help message
 
@@ -336,6 +343,11 @@ Send me some images to get started! 📸
     def no_pdfs() -> str:
         """No PDFs message"""
         return "❌ No PDFs pending. Send PDF files first."
+
+    @staticmethod
+    def url_usage() -> str:
+        """URL usage message"""
+        return "Usage: /url2pdf https://example.com"
     
     @staticmethod
     def compression_set(compression: CompressionLevel) -> str:
@@ -352,6 +364,7 @@ class ImageToPdfBot:
         self.doc_converter = DocumentToPdfConverter()
         self.text_converter = TextToPdfConverter()
         self.pdf_tools = PdfTools()
+        self.html_converter = HtmlToPdfConverter()
         self.user_sessions: Dict[int, UserSession] = {}
         self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
         self.debug_dir = 'debug_output'
@@ -510,6 +523,49 @@ class ImageToPdfBot:
                 await update.message.reply_text(f"❌ Split failed: {e}")
             finally:
                 session.clear_pdf_files()
+
+    async def compress_pdf_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Compress the last received PDF"""
+        session = self.get_user_session(update.effective_user.id)
+        if not session.get_pdf_count():
+            await update.message.reply_text(MessageTemplates.no_pdfs())
+            return
+
+        source_pdf = session.pdf_files[-1]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "compressed.pdf")
+            try:
+                compressed_path = self.pdf_tools.compress_pdf(source_pdf, output_path)
+                await update.message.reply_document(
+                    document=open(compressed_path, "rb"),
+                    caption="✅ PDF compressed successfully!",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                logger.error(f"Error compressing PDF: {e}")
+                await update.message.reply_text(f"❌ Compression failed: {e}")
+            finally:
+                session.clear_pdf_files()
+
+    async def url_to_pdf_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Convert a URL to PDF"""
+        if not context.args:
+            await update.message.reply_text(MessageTemplates.url_usage())
+            return
+
+        url = context.args[0]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "webpage.pdf")
+            try:
+                result = self.html_converter.convert_url(url, output_path)
+                await update.message.reply_document(
+                    document=open(result["pdf_path"], "rb"),
+                    caption="✅ URL converted to PDF!",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                logger.error(f"Error converting URL: {e}")
+                await update.message.reply_text(f"❌ URL conversion failed: {e}")
     
     async def _convert_single_image(self, image_path: str, output_path: Optional[str] = None, compress: CompressionLevel = CompressionLevel.MEDIUM) -> ConversionResult:
         """Convert single image to PDF"""
@@ -663,8 +719,14 @@ class ImageToPdfBot:
             converter = self.doc_converter
         elif file_extension in self.text_converter.supported_formats:
             converter = self.text_converter
+        elif file_extension in self.html_converter.supported_formats:
+            converter = self.html_converter
         else:
-            supported = list(self.doc_converter.supported_formats | self.text_converter.supported_formats)
+            supported = list(
+                self.doc_converter.supported_formats
+                | self.text_converter.supported_formats
+                | self.html_converter.supported_formats
+            )
             await update.message.reply_text(
                 MessageTemplates.unsupported_format(file_extension, supported)
             )
@@ -681,6 +743,8 @@ class ImageToPdfBot:
                 output_pdf = os.path.join(temp_dir, f"{Path(document.file_name).stem}.pdf")
                 if isinstance(converter, DocumentToPdfConverter):
                     result = converter.convert_document(doc_path, output_pdf)
+                elif isinstance(converter, HtmlToPdfConverter):
+                    result = converter.convert_html_file(doc_path, output_pdf)
                 else:
                     result = converter.convert_text(doc_path, output_pdf)
                 original_size = self.converter.format_file_size(result["original_size"])
@@ -739,6 +803,8 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("compress_low", self.set_compression_low))
         application.add_handler(CommandHandler("merge", self.merge_pdfs_command))
         application.add_handler(CommandHandler("split", self.split_pdf_command))
+        application.add_handler(CommandHandler("compress_pdf", self.compress_pdf_command))
+        application.add_handler(CommandHandler("url2pdf", self.url_to_pdf_command))
         
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
@@ -760,6 +826,8 @@ class ImageToPdfBot:
             BotCommand("compress_low", "Set low quality compression (70%)"),
             BotCommand("merge", "Merge pending PDFs"),
             BotCommand("split", "Split last PDF into pages"),
+            BotCommand("compress_pdf", "Compress last PDF"),
+            BotCommand("url2pdf", "Convert URL to PDF"),
             BotCommand("clear", "Clear all pending images")
         ]
         

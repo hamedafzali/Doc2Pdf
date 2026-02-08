@@ -4,3 +4,4 @@ python-telegram-bot[job-queue]>=20.0
 python-dotenv>=1.0.0
 reportlab>=4.0.0
 pypdf>=4.0.0
+pikepdf>=9.0.0

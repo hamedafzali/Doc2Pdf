@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libreoffice \
     fonts-dejavu-core \
+    wkhtmltopdf \
+    qpdf \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy application files
