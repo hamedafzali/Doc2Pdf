@@ -19,7 +19,12 @@ class MessageTemplates:
                 "• Text/Markdown → PDF (TXT, MD)\n"
                 "• HTML/URL → PDF\n"
                 "• PDF tools (merge, split, compress, OCR)\n\n"
-                "Use the command menu to get started."
+                "**Commands:**\n"
+                "/start, /help, /convert, /convert_now\n"
+                "/compress_high, /compress_medium, /compress_low\n"
+                "/merge, /split, /compress_pdf, /url2pdf, /ocr\n"
+                "/lang, /clear\n\n"
+                "Send me files to get started."
             ),
             Language.DE: (
                 "🖼️ **Bild-zu-PDF Bot**\n\n"
@@ -30,7 +35,12 @@ class MessageTemplates:
                 "• Text/Markdown → PDF (TXT, MD)\n"
                 "• HTML/URL → PDF\n"
                 "• PDF-Tools (Zusammenführen, Teilen, Komprimieren, OCR)\n\n"
-                "Nutze das Befehlsmenü, um zu starten."
+                "**Befehle:**\n"
+                "/start, /help, /convert, /convert_now\n"
+                "/compress_high, /compress_medium, /compress_low\n"
+                "/merge, /split, /compress_pdf, /url2pdf, /ocr\n"
+                "/lang, /clear\n\n"
+                "Sende Dateien, um zu starten."
             ),
             Language.FA: (
                 "🖼️ **ربات تبدیل به PDF**\n\n"
@@ -41,7 +51,12 @@ class MessageTemplates:
                 "• متن/مارک‌داون → PDF (TXT, MD)\n"
                 "• HTML/URL → PDF\n"
                 "• ابزارهای PDF (ادغام، تقسیم، فشرده‌سازی، OCR)\n\n"
-                "برای شروع از منوی دستورات استفاده کنید."
+                "**دستورات:**\n"
+                "/start, /help, /convert, /convert_now\n"
+                "/compress_high, /compress_medium, /compress_low\n"
+                "/merge, /split, /compress_pdf, /url2pdf, /ocr\n"
+                "/lang, /clear\n\n"
+                "برای شروع فایل بفرستید."
             ),
         },
         "help": {
