@@ -109,6 +109,7 @@ class ImageToPdfBot:
             await context.bot.delete_my_commands(scope=BotCommandScopeChat(update.effective_chat.id))
         except Exception:
             pass
+        await self._ensure_global_commands(context)
         await update.message.reply_text(MessageTemplates.t("lang_set", session.language))
 
     async def handle_lang_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -135,7 +136,12 @@ class ImageToPdfBot:
             await context.bot.delete_my_commands(scope=BotCommandScopeChat(query.message.chat_id))
         except Exception:
             pass
+        await self._ensure_global_commands(context)
         await query.edit_message_text(MessageTemplates.t("lang_set", session.language))
+
+    async def _ensure_global_commands(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Ensure global commands exist (for the menu button)."""
+        await context.bot.set_my_commands(self._commands_for(Language.EN))
     
     async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
         """Set compression level and convert"""
