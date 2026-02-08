@@ -14,7 +14,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 
-from telegram import Update, BotCommand
+from telegram import Update, BotCommand, BotCommandScopeChat
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
@@ -390,6 +390,27 @@ class ImageToPdfBot:
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command"""
+        # Clear any chat-scoped commands that could hide the menu
+        try:
+            await context.bot.delete_my_commands(scope=BotCommandScopeChat(update.effective_chat.id))
+        except Exception:
+            pass
+        # Ensure global commands are set
+        await context.bot.set_my_commands([
+            BotCommand("start", "Start bot and see welcome message"),
+            BotCommand("help", "Show help message"),
+            BotCommand("convert", "Choose compression options"),
+            BotCommand("convert_now", "Convert with current settings"),
+            BotCommand("compress_high", "Set high quality compression (95%)"),
+            BotCommand("compress_medium", "Set medium quality compression (85%)"),
+            BotCommand("compress_low", "Set low quality compression (70%)"),
+            BotCommand("merge", "Merge pending PDFs"),
+            BotCommand("split", "Split last PDF into pages"),
+            BotCommand("compress_pdf", "Compress last PDF"),
+            BotCommand("url2pdf", "Convert URL to PDF"),
+            BotCommand("ocr", "OCR last PDF"),
+            BotCommand("clear", "Clear all pending images")
+        ])
         await update.message.reply_text(MessageTemplates.welcome())
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
