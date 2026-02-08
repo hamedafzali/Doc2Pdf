@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from telegram import Update, BotCommand
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, BotCommand, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
 from image_converter import ImageToPdfConverter
@@ -84,7 +84,17 @@ class ImageToPdfBot:
         """Set user language"""
         session = self.get_user_session(update.effective_user.id)
         if not context.args:
-            await update.message.reply_text(MessageTemplates.t("lang_usage", session.language))
+            keyboard = [
+                [
+                    InlineKeyboardButton("English", callback_data="lang:en"),
+                    InlineKeyboardButton("Deutsch", callback_data="lang:de"),
+                    InlineKeyboardButton("فارسی", callback_data="lang:fa"),
+                ]
+            ]
+            await update.message.reply_text(
+                MessageTemplates.t("lang_usage", session.language),
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
             return
 
         lang_arg = context.args[0].lower()
@@ -95,6 +105,27 @@ class ImageToPdfBot:
 
         session.language = lang_map[lang_arg]
         await update.message.reply_text(MessageTemplates.t("lang_set", session.language))
+
+    async def handle_lang_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle language selection from inline buttons"""
+        query = update.callback_query
+        if not query or not query.data:
+            return
+
+        await query.answer()
+        data = query.data
+        if not data.startswith("lang:"):
+            return
+
+        lang_code = data.split(":", 1)[1]
+        session = self.get_user_session(query.from_user.id)
+        lang_map = {"en": Language.EN, "de": Language.DE, "fa": Language.FA}
+        if lang_code not in lang_map:
+            await query.edit_message_text(MessageTemplates.t("lang_usage", session.language))
+            return
+
+        session.language = lang_map[lang_code]
+        await query.edit_message_text(MessageTemplates.t("lang_set", session.language))
     
     async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
         """Set compression level and convert"""
@@ -534,6 +565,7 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
         application.add_handler(CommandHandler("compress_low", self.set_compression_low))
         application.add_handler(CommandHandler("lang", self.set_language_command))
+        application.add_handler(CallbackQueryHandler(self.handle_lang_callback, pattern="^lang:"))
         application.add_handler(CommandHandler("merge", self.merge_pdfs_command))
         application.add_handler(CommandHandler("split", self.split_pdf_command))
         application.add_handler(CommandHandler("compress_pdf", self.compress_pdf_command))
