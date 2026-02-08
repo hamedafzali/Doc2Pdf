@@ -613,8 +613,8 @@ class ImageToPdfBot:
                     BotCommand("lang", "Sprache setzen"),
                     BotCommand("clear", "Alle Dateien löschen"),
                 ]
-        if lang == Language.FA:
-            return [
+            if lang == Language.FA:
+                return [
                     BotCommand("start", "شروع ربات"),
                     BotCommand("help", "نمایش راهنما"),
                     BotCommand("convert", "انتخاب فشرده‌سازی"),
@@ -630,22 +630,24 @@ class ImageToPdfBot:
                     BotCommand("lang", "تنظیم زبان"),
                     BotCommand("clear", "پاک‌کردن همه فایل‌ها"),
                 ]
-        return [
-            BotCommand("start", "Start bot and see welcome message"),
-            BotCommand("help", "Show help message"),
-            BotCommand("convert", "Choose compression options"),
-            BotCommand("convert_now", "Convert with current settings"),
-            BotCommand("compress_high", "Set high quality compression (95%)"),
-            BotCommand("compress_medium", "Set medium quality compression (85%)"),
-            BotCommand("compress_low", "Set low quality compression (70%)"),
-            BotCommand("merge", "Merge pending PDFs"),
-            BotCommand("split", "Split last PDF into pages"),
-            BotCommand("compress_pdf", "Compress last PDF"),
-            BotCommand("url2pdf", "Convert URL to PDF"),
-            BotCommand("ocr", "OCR last PDF"),
-            BotCommand("lang", "Set language (en/de/fa)"),
-            BotCommand("clear", "Clear all pending files"),
-        ]
+            return [
+                BotCommand("start", "Start bot and see welcome message"),
+                BotCommand("help", "Show help message"),
+                BotCommand("convert", "Choose compression options"),
+                BotCommand("convert_now", "Convert with current settings"),
+                BotCommand("compress_high", "Set high quality compression (95%)"),
+                BotCommand("compress_medium", "Set medium quality compression (85%)"),
+                BotCommand("compress_low", "Set low quality compression (70%)"),
+                BotCommand("merge", "Merge pending PDFs"),
+                BotCommand("split", "Split last PDF into pages"),
+                BotCommand("compress_pdf", "Compress last PDF"),
+                BotCommand("url2pdf", "Convert URL to PDF"),
+                BotCommand("ocr", "OCR last PDF"),
+                BotCommand("lang", "Set language (en/de/fa)"),
+                BotCommand("clear", "Clear all pending files"),
+            ]
+
+        return []
     
     def run(self) -> None:
         """Run the bot"""
