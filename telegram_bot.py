@@ -63,16 +63,14 @@ class ImageToPdfBot:
         """Handle /start command"""
         session = self.get_user_session(update.effective_user.id)
         await update.message.reply_text(
-            MessageTemplates.t("welcome", session.language),
-            parse_mode=ParseMode.MARKDOWN
+            MessageTemplates.t("welcome", session.language)
         )
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /help command"""
         session = self.get_user_session(update.effective_user.id)
         await update.message.reply_text(
-            MessageTemplates.t("help", session.language),
-            parse_mode=ParseMode.MARKDOWN
+            MessageTemplates.t("help", session.language)
         )
     
     async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
