@@ -57,6 +57,21 @@ class CompressionLevel(Enum):
         }[self]
 
 
+class Language(Enum):
+    """Supported languages"""
+    EN = "en"
+    DE = "de"
+    FA = "fa"
+
+    @property
+    def title(self) -> str:
+        return {
+            Language.EN: "English",
+            Language.DE: "Deutsch",
+            Language.FA: "فارسی"
+        }[self]
+
+
 @dataclass
 class ConversionResult:
     """Result of image conversion"""
@@ -88,6 +103,7 @@ class UserSession:
         self.temp_files: List[str] = []
         self.compression_setting: CompressionLevel = CompressionLevel.MEDIUM
         self.pdf_files: List[str] = []
+        self.language: Language = Language.EN
         
     def add_temp_file(self, file_path: str):
         """Add temporary file to session"""
@@ -127,106 +143,116 @@ class UserSession:
 
 class MessageTemplates:
     """Centralized message templates"""
-    
-    @staticmethod
-    def welcome() -> str:
-        """Welcome message"""
-        return """
-🖼️ **Image to PDF Converter Bot**
 
-Welcome! I can convert your images to PDF format.
+    STRINGS = {
+        "welcome": {
+            Language.EN: (
+                "🖼️ **Image to PDF Converter Bot**\n\n"
+                "Welcome! I can convert your files to PDF.\n\n"
+                "**Features:**\n"
+                "• Images → PDF\n"
+                "• Office docs → PDF (DOCX, PPTX, XLSX)\n"
+                "• Text/Markdown → PDF (TXT, MD)\n"
+                "• HTML/URL → PDF\n"
+                "• PDF tools (merge, split, compress, OCR)\n\n"
+                "**Commands:**\n"
+                "/start, /help, /convert, /convert_now\n"
+                "/compress_high, /compress_medium, /compress_low\n"
+                "/merge, /split, /compress_pdf, /url2pdf, /ocr\n"
+                "/lang, /clear\n\n"
+                "Send me files to get started."
+            ),
+            Language.DE: (
+                "🖼️ **Bild-zu-PDF Bot**\n\n"
+                "Willkommen! Ich kann Dateien in PDF umwandeln.\n\n"
+                "**Funktionen:**\n"
+                "• Bilder → PDF\n"
+                "• Office-Dokumente → PDF (DOCX, PPTX, XLSX)\n"
+                "• Text/Markdown → PDF (TXT, MD)\n"
+                "• HTML/URL → PDF\n"
+                "• PDF-Tools (Zusammenführen, Teilen, Komprimieren, OCR)\n\n"
+                "**Befehle:**\n"
+                "/start, /help, /convert, /convert_now\n"
+                "/compress_high, /compress_medium, /compress_low\n"
+                "/merge, /split, /compress_pdf, /url2pdf, /ocr\n"
+                "/lang, /clear\n\n"
+                "Sende Dateien, um zu starten."
+            ),
+            Language.FA: (
+                "🖼️ **ربات تبدیل به PDF**\n\n"
+                "خوش آمدید! می‌توانم فایل‌ها را به PDF تبدیل کنم.\n\n"
+                "**امکانات:**\n"
+                "• تصویر → PDF\n"
+                "• اسناد آفیس → PDF (DOCX, PPTX, XLSX)\n"
+                "• متن/مارک‌داون → PDF (TXT, MD)\n"
+                "• HTML/URL → PDF\n"
+                "• ابزارهای PDF (ادغام، تقسیم، فشرده‌سازی، OCR)\n\n"
+                "**دستورات:**\n"
+                "/start, /help, /convert, /convert_now\n"
+                "/compress_high, /compress_medium, /compress_low\n"
+                "/merge, /split, /compress_pdf, /url2pdf, /ocr\n"
+                "/lang, /clear\n\n"
+                "برای شروع فایل بفرستید."
+            ),
+        },
+        "help": {
+            Language.EN: (
+                "📖 **Help**\n\n"
+                "**Supported:** JPG/PNG/BMP/TIFF/GIF/WebP, DOCX/PPTX/XLSX, TXT/MD, HTML/HTM, PDF\n\n"
+                "**PDF Tools:** /merge /split /compress_pdf /ocr\n"
+                "**URL:** /url2pdf https://example.com\n"
+                "**Language:** /lang en|de|fa\n"
+            ),
+            Language.DE: (
+                "📖 **Hilfe**\n\n"
+                "**Unterstützt:** JPG/PNG/BMP/TIFF/GIF/WebP, DOCX/PPTX/XLSX, TXT/MD, HTML/HTM, PDF\n\n"
+                "**PDF-Tools:** /merge /split /compress_pdf /ocr\n"
+                "**URL:** /url2pdf https://example.com\n"
+                "**Sprache:** /lang en|de|fa\n"
+            ),
+            Language.FA: (
+                "📖 **راهنما**\n\n"
+                "**پشتیبانی:** JPG/PNG/BMP/TIFF/GIF/WebP, DOCX/PPTX/XLSX, TXT/MD, HTML/HTM, PDF\n\n"
+                "**ابزارهای PDF:** /merge /split /compress_pdf /ocr\n"
+                "**URL:** /url2pdf https://example.com\n"
+                "**زبان:** /lang en|de|fa\n"
+            ),
+        },
+        "lang_set": {
+            Language.EN: "✅ Language set to English.",
+            Language.DE: "✅ Sprache auf Deutsch eingestellt.",
+            Language.FA: "✅ زبان روی فارسی تنظیم شد.",
+        },
+        "lang_usage": {
+            Language.EN: "Usage: /lang en|de|fa",
+            Language.DE: "Verwendung: /lang en|de|fa",
+            Language.FA: "نحوه استفاده: /lang en|de|fa",
+        },
+        "no_pdfs": {
+            Language.EN: "❌ No PDFs pending. Send PDF files first.",
+            Language.DE: "❌ Keine PDFs vorhanden. Bitte zuerst PDFs senden.",
+            Language.FA: "❌ هیچ PDFی موجود نیست. ابتدا PDF بفرستید.",
+        },
+        "files_cleared": {
+            Language.EN: "🗑️ Cleared all pending files!",
+            Language.DE: "🗑️ Alle ausstehenden Dateien wurden gelöscht!",
+            Language.FA: "🗑️ همه فایل‌های در صف پاک شد!",
+        },
+        "url_usage": {
+            Language.EN: "Usage: /url2pdf https://example.com",
+            Language.DE: "Verwendung: /url2pdf https://example.com",
+            Language.FA: "نحوه استفاده: /url2pdf https://example.com",
+        },
+        "ocr_usage": {
+            Language.EN: "Usage: /ocr [language]\nExample: /ocr eng",
+            Language.DE: "Verwendung: /ocr [language]\nBeispiel: /ocr deu",
+            Language.FA: "نحوه استفاده: /ocr [language]\nمثال: /ocr fas",
+        },
+    }
 
-**Features:**
-• Convert single images to PDF
-• Combine multiple images into one PDF
-• Convert Office docs to PDF (DOCX, PPTX, XLSX)
-• Convert text/markdown to PDF (TXT, MD)
-• Convert HTML/URL to PDF
-• **NEW:** PDF compression options
-• Supports: JPG, PNG, BMP, TIFF, GIF, WebP
-
-**How to use:**
-1. Send me one or more images
-2. Use /convert to see compression options
-3. Choose compression level:
-   - /compress_high (95%) - Best quality
-   - /compress_medium (85%) - Default
-   - /compress_low (70%) - Smallest file
-   - /convert_now - Use current setting
-4. Download the PDF file with detailed size info
-
-**Commands:**
-/start - Show this help message
-/help - Show help message
-/convert - Choose compression options
-/convert_now - Convert with current settings
-/compress_high - Set high quality compression (95%)
-/compress_medium - Set medium quality compression (85%) - Default
-/compress_low - Set low quality compression (70%) - Smallest file
-/merge - Merge pending PDFs
-/split - Split the last PDF (one per page)
-/compress_pdf - Compress the last PDF
-/url2pdf - Convert a URL to PDF
-/ocr - Make the last PDF searchable
-/clear - Clear pending images
-
-Send me some images to get started! 📸
-        """
-    
-    @staticmethod
-    def help() -> str:
-        """Help message"""
-        return """
-📖 **Help - Image to PDF Converter**
-
-**Supported Formats:**
-• JPG/JPEG
-• PNG
-• BMP
-• TIFF
-• GIF
-• WebP
-• DOCX, PPTX, XLSX
-• TXT, MD
-• HTML, HTM
-
-**Compression Options:**
-• /compress_high - Best quality (95%) - Larger files
-• /compress_medium - Good balance (85%) - Default
-• /compress_low - Smallest files (70%) - Lower quality
-
-**Usage:**
-1. Send one or more images
-2. Use /convert to see compression options
-3. Choose compression level or use /convert_now
-4. Download the PDF file with detailed size information
-
-**File Size Info:**
-• Shows original image size
-• Shows final PDF size
-• Shows compression ratio when applicable
-
-**Commands:**
-/start - Start bot and see welcome message
-/convert - Choose compression options
-/convert_now - Convert with current settings
-/compress_high - Set high quality compression
-/compress_medium - Set medium quality compression
-/compress_low - Set low quality compression
-/merge - Merge pending PDFs
-/split - Split the last PDF (one per page)
-/compress_pdf - Compress the last PDF
-/url2pdf - Convert a URL to PDF
-/ocr - Make the last PDF searchable
-/clear - Clear all pending images
-/help - Show this help message
-
-**Tips:**
-• Send multiple images to combine them into one PDF
-• Images are processed in the order you send them
-• Use compression for smaller file sizes
-• Temporary files are automatically cleaned up
-        """
+    @classmethod
+    def get(cls, key: str, lang: Language) -> str:
+        return cls.STRINGS.get(key, {}).get(lang) or cls.STRINGS.get(key, {}).get(Language.EN, "")
     
     @staticmethod
     def compression_options(image_count: int, current_setting: CompressionLevel) -> str:
@@ -390,18 +416,42 @@ class ImageToPdfBot:
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command"""
-        await update.message.reply_text(MessageTemplates.welcome(), parse_mode=ParseMode.MARKDOWN)
+        session = self.get_user_session(update.effective_user.id)
+        await update.message.reply_text(
+            MessageTemplates.get("welcome", session.language),
+            parse_mode=ParseMode.MARKDOWN
+        )
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /help command"""
-        await update.message.reply_text(MessageTemplates.help(), parse_mode=ParseMode.MARKDOWN)
+        session = self.get_user_session(update.effective_user.id)
+        await update.message.reply_text(
+            MessageTemplates.get("help", session.language),
+            parse_mode=ParseMode.MARKDOWN
+        )
     
     async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /clear command"""
         session = self.get_user_session(update.effective_user.id)
         session.clear_temp_files()
         session.clear_pdf_files()
-        await update.message.reply_text(MessageTemplates.files_cleared())
+        await update.message.reply_text(MessageTemplates.get("files_cleared", session.language))
+
+    async def set_language_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Set user language"""
+        session = self.get_user_session(update.effective_user.id)
+        if not context.args:
+            await update.message.reply_text(MessageTemplates.get("lang_usage", session.language))
+            return
+
+        lang_arg = context.args[0].lower()
+        lang_map = {"en": Language.EN, "de": Language.DE, "fa": Language.FA}
+        if lang_arg not in lang_map:
+            await update.message.reply_text(MessageTemplates.get("lang_usage", session.language))
+            return
+
+        session.language = lang_map[lang_arg]
+        await update.message.reply_text(MessageTemplates.get("lang_set", session.language))
     
     async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
         """Set compression level and convert"""
@@ -489,7 +539,7 @@ class ImageToPdfBot:
         """Merge all pending PDFs into one"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.no_pdfs())
+            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
             return
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -511,7 +561,7 @@ class ImageToPdfBot:
         """Split the last received PDF into one file per page"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.no_pdfs())
+            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
             return
 
         source_pdf = session.pdf_files[-1]
@@ -535,7 +585,7 @@ class ImageToPdfBot:
         """Compress the last received PDF"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.no_pdfs())
+            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
             return
 
         source_pdf = session.pdf_files[-1]
@@ -557,7 +607,8 @@ class ImageToPdfBot:
     async def url_to_pdf_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Convert a URL to PDF"""
         if not context.args:
-            await update.message.reply_text(MessageTemplates.url_usage())
+            session = self.get_user_session(update.effective_user.id)
+            await update.message.reply_text(MessageTemplates.get("url_usage", session.language))
             return
 
         url = context.args[0]
@@ -578,12 +629,16 @@ class ImageToPdfBot:
         """Run OCR on the last received PDF"""
         session = self.get_user_session(update.effective_user.id)
         if not session.get_pdf_count():
-            await update.message.reply_text(MessageTemplates.no_pdfs())
+            await update.message.reply_text(MessageTemplates.get("no_pdfs", session.language))
             return
 
         language = "eng"
         if context.args:
             language = context.args[0]
+        else:
+            session = self.get_user_session(update.effective_user.id)
+            default_map = {Language.EN: "eng", Language.DE: "deu", Language.FA: "fas"}
+            language = default_map.get(session.language, "eng")
 
         source_pdf = session.pdf_files[-1]
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -835,6 +890,7 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("compress_high", self.set_compression_high))
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
         application.add_handler(CommandHandler("compress_low", self.set_compression_low))
+        application.add_handler(CommandHandler("lang", self.set_language_command))
         application.add_handler(CommandHandler("merge", self.merge_pdfs_command))
         application.add_handler(CommandHandler("split", self.split_pdf_command))
         application.add_handler(CommandHandler("compress_pdf", self.compress_pdf_command))
@@ -864,6 +920,7 @@ class ImageToPdfBot:
             BotCommand("compress_pdf", "Compress last PDF"),
             BotCommand("url2pdf", "Convert URL to PDF"),
             BotCommand("ocr", "OCR last PDF"),
+            BotCommand("lang", "Set language (en/de/fa)"),
             BotCommand("clear", "Clear all pending images")
         ]
         

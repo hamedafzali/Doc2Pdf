@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     wkhtmltopdf \
     qpdf \
     tesseract-ocr \
+    tesseract-ocr-deu \
+    tesseract-ocr-fas \
     ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
