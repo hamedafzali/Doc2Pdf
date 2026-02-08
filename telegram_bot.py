@@ -582,61 +582,24 @@ class ImageToPdfBot:
     
     async def set_bot_commands(self, application: Application) -> None:
         """Set bot commands"""
-        def commands_for(lang: Language):
-            if lang == Language.DE:
-                return [
-                    BotCommand("start", "Bot starten"),
-                    BotCommand("help", "Hilfe anzeigen"),
-                    BotCommand("convert", "Komprimierung wählen"),
-                    BotCommand("convert_now", "Mit aktueller Einstellung konvertieren"),
-                    BotCommand("compress_high", "Hohe Qualität (95%)"),
-                    BotCommand("compress_medium", "Mittlere Qualität (85%)"),
-                    BotCommand("compress_low", "Niedrige Qualität (70%)"),
-                    BotCommand("merge", "PDFs zusammenführen"),
-                    BotCommand("split", "Letztes PDF teilen"),
-                    BotCommand("compress_pdf", "Letztes PDF komprimieren"),
-                    BotCommand("url2pdf", "URL in PDF umwandeln"),
-                    BotCommand("ocr", "OCR für letztes PDF"),
-                    BotCommand("lang", "Sprache setzen"),
-                    BotCommand("clear", "Alle Dateien löschen"),
-                ]
-            if lang == Language.FA:
-                return [
-                    BotCommand("start", "شروع ربات"),
-                    BotCommand("help", "نمایش راهنما"),
-                    BotCommand("convert", "انتخاب فشرده‌سازی"),
-                    BotCommand("convert_now", "تبدیل با تنظیم فعلی"),
-                    BotCommand("compress_high", "کیفیت بالا (۹۵٪)"),
-                    BotCommand("compress_medium", "کیفیت متوسط (۸۵٪)"),
-                    BotCommand("compress_low", "کیفیت پایین (۷۰٪)"),
-                    BotCommand("merge", "ادغام PDFها"),
-                    BotCommand("split", "تقسیم آخرین PDF"),
-                    BotCommand("compress_pdf", "فشرده‌سازی آخرین PDF"),
-                    BotCommand("url2pdf", "تبدیل URL به PDF"),
-                    BotCommand("ocr", "OCR برای آخرین PDF"),
-                    BotCommand("lang", "تنظیم زبان"),
-                    BotCommand("clear", "پاک‌کردن همه فایل‌ها"),
-                ]
-            return [
-                BotCommand("start", "Start bot and see welcome message"),
-                BotCommand("help", "Show help message"),
-                BotCommand("convert", "Choose compression options"),
-                BotCommand("convert_now", "Convert with current settings"),
-                BotCommand("compress_high", "Set high quality compression (95%)"),
-                BotCommand("compress_medium", "Set medium quality compression (85%)"),
-                BotCommand("compress_low", "Set low quality compression (70%)"),
-                BotCommand("merge", "Merge pending PDFs"),
-                BotCommand("split", "Split last PDF into pages"),
-                BotCommand("compress_pdf", "Compress last PDF"),
-                BotCommand("url2pdf", "Convert URL to PDF"),
-                BotCommand("ocr", "OCR last PDF"),
-                BotCommand("lang", "Set language (en/de/fa)"),
-                BotCommand("clear", "Clear all pending files"),
-            ]
-
-        await application.bot.set_my_commands(commands_for(Language.EN))
-        await application.bot.set_my_commands(commands_for(Language.DE), language_code="de")
-        await application.bot.set_my_commands(commands_for(Language.FA), language_code="fa")
+        commands = [
+            BotCommand("start", "Start bot and see welcome message"),
+            BotCommand("help", "Show help message"),
+            BotCommand("convert", "Choose compression options"),
+            BotCommand("convert_now", "Convert with current settings"),
+            BotCommand("compress_high", "Set high quality compression (95%)"),
+            BotCommand("compress_medium", "Set medium quality compression (85%)"),
+            BotCommand("compress_low", "Set low quality compression (70%)"),
+            BotCommand("merge", "Merge pending PDFs"),
+            BotCommand("split", "Split last PDF into pages"),
+            BotCommand("compress_pdf", "Compress last PDF"),
+            BotCommand("url2pdf", "Convert URL to PDF"),
+            BotCommand("ocr", "OCR last PDF"),
+            BotCommand("lang", "Set language (en/de/fa)"),
+            BotCommand("clear", "Clear all pending images")
+        ]
+        
+        await application.bot.set_my_commands(commands)
     
     def run(self) -> None:
         """Run the bot"""
