@@ -20,6 +20,30 @@ A Python application that converts images to PDF format with support for both st
 ✅ Telegram bot with interactive compression
 ✅ Web-based management interface (separated)
 
+## Next Goals (Feature-Focused)
+
+1. Convert Other Document Types (Priority)
+   - Add PDF output from Office docs (DOCX, PPTX, XLSX).
+   - Add PDF output from text/markdown (TXT, MD).
+   - Add PDF output from HTML/URL input.
+   - Add clear user messaging for unsupported formats.
+
+2. New User-Facing Features
+   - Add /merge to combine multiple PDFs into one.
+   - Add /split to split a PDF into pages or page ranges.
+   - Add /compress_pdf to reduce size of existing PDFs.
+   - Add /ocr to make scanned PDFs searchable.
+
+3. Media Enhancements
+   - Add image rotation/crop before conversion.
+   - Add page size selection (A4, Letter, Auto).
+   - Add watermark and header/footer options.
+
+4. Sharing and Output Options
+   - Add output naming templates (date, user, title).
+   - Add zip delivery for multiple outputs.
+   - Add a shareable download link option.
+
 ## Project Structure
 
 ```
