@@ -13,6 +13,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from telegram import Update, BotCommand, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import BotCommandScopeChat
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
@@ -104,6 +105,7 @@ class ImageToPdfBot:
             return
 
         session.language = lang_map[lang_arg]
+        await self._set_chat_commands(update.effective_chat.id, session.language, context)
         await update.message.reply_text(MessageTemplates.t("lang_set", session.language))
 
     async def handle_lang_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -125,7 +127,13 @@ class ImageToPdfBot:
             return
 
         session.language = lang_map[lang_code]
+        await self._set_chat_commands(query.message.chat_id, session.language, context)
         await query.edit_message_text(MessageTemplates.t("lang_set", session.language))
+
+    async def _set_chat_commands(self, chat_id: int, lang: Language, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Override commands for this chat language"""
+        commands = self._commands_for(lang)
+        await context.bot.set_my_commands(commands, scope=BotCommandScopeChat(chat_id))
     
     async def set_compression(self, update: Update, context: ContextTypes.DEFAULT_TYPE, compression: CompressionLevel) -> None:
         """Set compression level and convert"""
@@ -582,9 +590,14 @@ class ImageToPdfBot:
     
     async def set_bot_commands(self, application: Application) -> None:
         """Set bot commands"""
-        def commands_for(lang: Language):
-            if lang == Language.DE:
-                return [
+        await application.bot.set_my_commands(self._commands_for(Language.EN))
+        await application.bot.set_my_commands(self._commands_for(Language.DE), language_code="de")
+        await application.bot.set_my_commands(self._commands_for(Language.FA), language_code="fa")
+        await application.bot.set_my_commands(self._commands_for(Language.FA), language_code="fa-IR")
+
+    def _commands_for(self, lang: Language):
+        if lang == Language.DE:
+            return [
                     BotCommand("start", "Bot starten"),
                     BotCommand("help", "Hilfe anzeigen"),
                     BotCommand("convert", "Komprimierung wählen"),
@@ -634,10 +647,7 @@ class ImageToPdfBot:
                 BotCommand("clear", "Clear all pending files"),
             ]
 
-        await application.bot.set_my_commands(commands_for(Language.EN))
-        await application.bot.set_my_commands(commands_for(Language.DE), language_code="de")
-        await application.bot.set_my_commands(commands_for(Language.FA), language_code="fa")
-        await application.bot.set_my_commands(commands_for(Language.FA), language_code="fa-IR")
+        return []
     
     def run(self) -> None:
         """Run the bot"""
