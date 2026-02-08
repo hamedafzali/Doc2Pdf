@@ -390,11 +390,11 @@ class ImageToPdfBot:
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command"""
-        await update.message.reply_text(MessageTemplates.welcome(), parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(MessageTemplates.welcome())
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /help command"""
-        await update.message.reply_text(MessageTemplates.help(), parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(MessageTemplates.help())
     
     async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /clear command"""
