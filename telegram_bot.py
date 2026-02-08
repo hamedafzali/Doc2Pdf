@@ -637,6 +637,7 @@ class ImageToPdfBot:
         await application.bot.set_my_commands(commands_for(Language.EN))
         await application.bot.set_my_commands(commands_for(Language.DE), language_code="de")
         await application.bot.set_my_commands(commands_for(Language.FA), language_code="fa")
+        await application.bot.set_my_commands(commands_for(Language.FA), language_code="fa-IR")
     
     def run(self) -> None:
         """Run the bot"""
