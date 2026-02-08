@@ -20,6 +20,7 @@ from telegram.constants import ParseMode
 
 from image_converter import ImageToPdfConverter
 from document_converter import DocumentToPdfConverter
+from text_converter import TextToPdfConverter
 
 # Configure logging
 logging.basicConfig(
@@ -119,6 +120,7 @@ Welcome! I can convert your images to PDF format.
 • Convert single images to PDF
 • Combine multiple images into one PDF
 • Convert Office docs to PDF (DOCX, PPTX, XLSX)
+• Convert text/markdown to PDF (TXT, MD)
 • **NEW:** PDF compression options
 • Supports: JPG, PNG, BMP, TIFF, GIF, WebP
 
@@ -159,6 +161,7 @@ Send me some images to get started! 📸
 • GIF
 • WebP
 • DOCX, PPTX, XLSX
+• TXT, MD
 
 **Compression Options:**
 • /compress_high - Best quality (95%) - Larger files
@@ -314,6 +317,7 @@ class ImageToPdfBot:
         self.token = token
         self.converter = ImageToPdfConverter()
         self.doc_converter = DocumentToPdfConverter()
+        self.text_converter = TextToPdfConverter()
         self.user_sessions: Dict[int, UserSession] = {}
         self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
         self.debug_dir = 'debug_output'
@@ -553,8 +557,8 @@ class ImageToPdfBot:
                 os.unlink(temp_file.name)
                 session.temp_files.remove(temp_file.name)
 
-    async def handle_office_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle Office document uploads (DOCX, PPTX, XLSX)"""
+    async def handle_non_image_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle non-image documents (Office and text/markdown)"""
         document = update.message.document
 
         if not document or not document.file_name:
@@ -562,9 +566,15 @@ class ImageToPdfBot:
             return
 
         file_extension = Path(document.file_name).suffix.lower()
-        if file_extension not in self.doc_converter.supported_formats:
+        converter = None
+        if file_extension in self.doc_converter.supported_formats:
+            converter = self.doc_converter
+        elif file_extension in self.text_converter.supported_formats:
+            converter = self.text_converter
+        else:
+            supported = list(self.doc_converter.supported_formats | self.text_converter.supported_formats)
             await update.message.reply_text(
-                MessageTemplates.unsupported_format(file_extension, list(self.doc_converter.supported_formats))
+                MessageTemplates.unsupported_format(file_extension, supported)
             )
             return
 
@@ -577,7 +587,10 @@ class ImageToPdfBot:
 
             try:
                 output_pdf = os.path.join(temp_dir, f"{Path(document.file_name).stem}.pdf")
-                result = self.doc_converter.convert_document(doc_path, output_pdf)
+                if isinstance(converter, DocumentToPdfConverter):
+                    result = converter.convert_document(doc_path, output_pdf)
+                else:
+                    result = converter.convert_text(doc_path, output_pdf)
                 original_size = self.converter.format_file_size(result["original_size"])
                 pdf_size = self.converter.format_file_size(result["pdf_size"])
 
@@ -636,7 +649,7 @@ class ImageToPdfBot:
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
         application.add_handler(MessageHandler(filters.Document.IMAGE, self.handle_document))
-        application.add_handler(MessageHandler(filters.Document.ALL & ~filters.Document.IMAGE, self.handle_office_document))
+        application.add_handler(MessageHandler(filters.Document.ALL & ~filters.Document.IMAGE, self.handle_non_image_document))
         
         # Error handler
         application.add_error_handler(self.error_handler)
