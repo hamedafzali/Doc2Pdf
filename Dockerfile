@@ -18,6 +18,9 @@ RUN apt-get update && apt-get install -y \
 # Copy application files
 COPY requirements.txt ./
 COPY *.py ./
+COPY profile.jpg ./
+# Copy environment file if it exists
+COPY .env ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
@@ -35,6 +38,7 @@ USER appuser
 # Environment variables
 ENV PYTHONPATH=/app
 ENV LOG_LEVEL=INFO
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 
 # Default command
 CMD ["python", "bot_runner.py"]

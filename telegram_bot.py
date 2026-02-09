@@ -218,6 +218,7 @@ Send me some images to get started! 📸
 /compress_pdf - Compress the last PDF
 /url2pdf - Convert a URL to PDF
 /ocr - Make the last PDF searchable
+/ocr_image - Extract text from the last image (optional: specify language)
 /clear - Clear all pending images
 /help - Show this help message
 
@@ -357,6 +358,11 @@ Send me some images to get started! 📸
         return "Usage: /ocr [language]\nExample: /ocr eng"
     
     @staticmethod
+    def ocr_image_usage() -> str:
+        """OCR image usage message"""
+        return "Usage: /ocr_image [language]\nExample: /ocr_image eng\n\nLanguage is optional - defaults to English (eng) if not specified.\n\nSupported languages: eng (English), fra (French), deu (German), spa (Spanish), ita (Italian), por (Portuguese), rus (Russian), chi_sim (Chinese Simplified), jpn (Japanese)"
+    
+    @staticmethod
     def compression_set(compression: CompressionLevel) -> str:
         """Compression set message"""
         return f"🔧 Compression set to **{compression.title}**"
@@ -407,7 +413,7 @@ class ImageToPdfBot:
             BotCommand("merge", "Merge pending PDFs"),
             BotCommand("split", "Split last PDF into pages"),
             BotCommand("compress_pdf", "Compress last PDF"),
-            BotCommand("url2pdf", "Convert URL to PDF"),
+            BotCommand("url2pdf", "Convert a URL to PDF"),
             BotCommand("ocr", "OCR last PDF"),
             BotCommand("clear", "Clear all pending images")
         ])
@@ -483,17 +489,17 @@ class ImageToPdfBot:
                 
                 # Convert images to debug location
                 if image_count == 1:
-                    result = self._convert_single_image(session.temp_files[0], debug_path, compression)
+                    result = await self._convert_single_image(session.temp_files[0], debug_path, compression)
                 else:
-                    result = self._convert_multiple_images(session.temp_files, debug_path, compression)
+                    result = await self._convert_multiple_images(session.temp_files, debug_path, compression)
                 
                 logger.info(f"Debug mode: PDF saved to {debug_path}")
             else:
                 # Normal conversion
                 if image_count == 1:
-                    result = self._convert_single_image(session.temp_files[0], compress=compression)
+                    result = await self._convert_single_image(session.temp_files[0], compress=compression)
                 else:
-                    result = self._convert_multiple_images(session.temp_files, compress=compression)
+                    result = await self._convert_multiple_images(session.temp_files, compress=compression)
             
             # Send results
             await self._send_conversion_results(update, result, processing_message, image_count)
@@ -622,18 +628,61 @@ class ImageToPdfBot:
             finally:
                 session.clear_pdf_files()
     
+    async def ocr_image_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Run OCR on the last received image"""
+        session = self.get_user_session(update.effective_user.id)
+        if not session.get_file_count():
+            await update.message.reply_text("❌ No images found. Please send an image first.")
+            return
+
+        # Default to English if no language specified
+        language = "eng"
+        if context.args and len(context.args) > 0:
+            language = context.args[0]
+
+        source_image = session.temp_files[-1]
+        
+        try:
+            # Send processing message
+            processing_message = await update.message.reply_text("🔍 Performing OCR on image...")
+            
+            # Perform OCR on the image
+            extracted_text = self.converter.ocr_image(source_image, language)
+            
+            if extracted_text.strip():
+                # Send extracted text
+                if len(extracted_text) > 4000:  # Telegram message limit
+                    # Split long text into chunks
+                    chunks = [extracted_text[i:i+4000] for i in range(0, len(extracted_text), 4000)]
+                    await processing_message.edit_text("✅ OCR completed! Text extracted:")
+                    
+                    for i, chunk in enumerate(chunks, 1):
+                        await update.message.reply_text(f"📄 Part {i}/{len(chunks)}:\n\n{chunk}")
+                else:
+                    await processing_message.edit_text(f"✅ OCR completed!\n\n📄 Extracted text:\n\n{extracted_text}")
+            else:
+                await processing_message.edit_text("✅ OCR completed, but no text was found in the image.")
+                
+        except Exception as e:
+            logger.error(f"Error running OCR on image: {e}")
+            await update.message.reply_text(f"❌ OCR failed: {e}")
+        finally:
+            # Clean up temporary files
+            session.clear_temp_files()
+    
     async def _convert_single_image(self, image_path: str, output_path: Optional[str] = None, compress: CompressionLevel = CompressionLevel.MEDIUM) -> ConversionResult:
         """Convert single image to PDF"""
         try:
-            result = self.converter.convert_single_image(image_path, output_path, compress)
+            # Run the synchronous conversion method
+            result_dict = self.converter.convert_single_image(image_path, output_path, compress.value if compress else None)
             return ConversionResult(
                 success=True,
-                pdf_path=result['pdf_path'],
-                original_size=result.get('original_size'),
-                pdf_size=result.get('pdf_size'),
+                pdf_path=result_dict['pdf_path'],
+                original_size=result_dict.get('original_size'),
+                pdf_size=result_dict.get('pdf_size'),
                 compression_used=compress,
-                original_format=result.get('original_format'),
-                image_dimensions=result.get('image_dimensions')
+                original_format=result_dict.get('original_format'),
+                image_dimensions=result_dict.get('image_dimensions')
             )
         except Exception as e:
             logger.error(f"Error converting single image: {e}")
@@ -642,14 +691,15 @@ class ImageToPdfBot:
     async def _convert_multiple_images(self, image_paths: List[str], output_path: Optional[str] = None, compress: CompressionLevel = CompressionLevel.MEDIUM) -> ConversionResult:
         """Convert multiple images to PDF"""
         try:
-            result = self.converter.convert_multiple_images(image_paths, output_path, compress)
+            # Run synchronous conversion method
+            result_dict = self.converter.convert_multiple_images(image_paths, output_path, compress.value if compress else None)
             return ConversionResult(
                 success=True,
-                pdf_path=result['pdf_path'],
-                total_original_size=result.get('total_original_size'),
-                pdf_size=result.get('pdf_size'),
+                pdf_path=result_dict['pdf_path'],
+                total_original_size=result_dict.get('total_original_size'),
+                pdf_size=result_dict.get('pdf_size'),
                 compression_used=compress,
-                image_count=result.get('image_count')
+                image_count=result_dict.get('image_count')
             )
         except Exception as e:
             logger.error(f"Error converting multiple images: {e}")
@@ -661,18 +711,49 @@ class ImageToPdfBot:
             await processing_message.edit_text(MessageTemplates.conversion_error(result.error_message))
             return
         
-        # Send PDF file
-        await update.message.reply_document(
-            document=open(result.pdf_path, 'rb'),
-            caption=MessageTemplates.conversion_success(result, image_count),
-            parse_mode=ParseMode.MARKDOWN
-        )
+        try:
+            # Send PDF file with timeout
+            await asyncio.wait_for(
+                update.message.reply_document(
+                    document=open(result.pdf_path, 'rb'),
+                    caption=MessageTemplates.conversion_success(result, image_count),
+                    parse_mode=ParseMode.MARKDOWN
+                ),
+                timeout=30.0  # 30 second timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout sending PDF document: {result.pdf_path}")
+            await processing_message.edit_text("❌ Upload timed out. The PDF was created but sending failed. Please try again.")
+            return
+        except Exception as e:
+            logger.error(f"Error sending PDF document: {e}")
+            await processing_message.edit_text(f"❌ Error sending PDF: {str(e)}")
+            return
         
-        # Update processing message
-        await processing_message.edit_text(MessageTemplates.conversion_success(result, image_count))
+        try:
+            # Update processing message
+            await asyncio.wait_for(
+                processing_message.edit_text(MessageTemplates.conversion_success(result, image_count)),
+                timeout=10.0  # 10 second timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error("Timeout updating processing message")
+            # Don't fail the whole process if just the message update times out
+            pass
+        except Exception as e:
+            logger.error(f"Error updating processing message: {e}")
         
-        # Send file size info
-        await update.message.reply_text(MessageTemplates.file_size_info(result), parse_mode=ParseMode.MARKDOWN)
+        try:
+            # Send file size info
+            await asyncio.wait_for(
+                update.message.reply_text(MessageTemplates.file_size_info(result), parse_mode=ParseMode.MARKDOWN),
+                timeout=10.0  # 10 second timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error("Timeout sending file size info")
+            pass
+        except Exception as e:
+            logger.error(f"Error sending file size info: {e}")
         
         # Clean up PDF file after sending (only if not in debug mode)
         if not self.debug_mode:
@@ -854,13 +935,17 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("convert", self.convert_command))
         application.add_handler(CommandHandler("convert_now", self.convert_now_command))
         application.add_handler(CommandHandler("compress_high", self.set_compression_high))
+        application.add_handler(CommandHandler("compresshigh", self.set_compression_high))  # Alias for compress_high
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
+        application.add_handler(CommandHandler("compressmedium", self.set_compression_medium))  # Alias for compress_medium
         application.add_handler(CommandHandler("compress_low", self.set_compression_low))
+        application.add_handler(CommandHandler("compresslow", self.set_compression_low))  # Alias for compress_low
         application.add_handler(CommandHandler("merge", self.merge_pdfs_command))
         application.add_handler(CommandHandler("split", self.split_pdf_command))
         application.add_handler(CommandHandler("compress_pdf", self.compress_pdf_command))
         application.add_handler(CommandHandler("url2pdf", self.url_to_pdf_command))
         application.add_handler(CommandHandler("ocr", self.ocr_pdf_command))
+        application.add_handler(CommandHandler("ocr_image", self.ocr_image_command))
         
         # Message handlers
         application.add_handler(MessageHandler(filters.PHOTO, self.handle_image))
@@ -885,10 +970,28 @@ class ImageToPdfBot:
             BotCommand("compress_pdf", "Compress last PDF"),
             BotCommand("url2pdf", "Convert URL to PDF"),
             BotCommand("ocr", "OCR last PDF"),
+            BotCommand("ocr_image", "Extract text from last image (optional language)"),
             BotCommand("clear", "Clear all pending images")
         ]
         
         await application.bot.set_my_commands(commands)
+        
+        # Set bot profile picture if profile.jpg exists
+        try:
+            profile_path = os.path.join(os.path.dirname(__file__), 'profile.jpg')
+
+            if not os.path.exists(profile_path):
+                logger.warning("Profile image not found.")
+                return
+
+            # Profile picture is ready for manual upload
+            logger.info("📸 Bot profile picture is ready!")
+            logger.info(f"📁 Profile picture location: {profile_path}")
+            logger.info("� To set profile picture: Use @BotFather /setuserpic command")
+            logger.info("🔧 Bot profile picture setup completed (manual upload required)")
+
+        except Exception as e:
+            logger.exception(f"❌ Failed to prepare bot profile photo: {e}")
     
     def run(self) -> None:
         """Run the bot"""

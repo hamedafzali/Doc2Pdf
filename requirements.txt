@@ -6,3 +6,5 @@ reportlab>=4.0.0
 pypdf>=4.0.0
 pikepdf>=9.0.0
 ocrmypdf>=16.0.0
+pytesseract>=0.3.10
+requests>=2.31.0

@@ -6,13 +6,15 @@ services:
     container_name: doc2pdf-bot
     restart: unless-stopped
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - DEBUG_MODE=${DEBUG_MODE:-false}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+      - DEBUG_MODE=true
     volumes:
       - ./debug_output:/app/debug_output
+    networks:
+      - doc2pdf-network
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "python"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

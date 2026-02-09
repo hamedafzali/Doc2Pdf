@@ -302,6 +302,43 @@ class ImageToPdfConverter:
         logger.info(f"Successfully converted {len(converted_files)} images")
         return converted_files
 
+    def ocr_image(self, image_path: str, language: str = "eng") -> str:
+        """
+        Extract text from an image using Tesseract OCR
+        
+        Args:
+            image_path: Path to the image file
+            language: OCR language code (default: 'eng' for English)
+            
+        Returns:
+            Extracted text as string
+        """
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image file not found: {image_path}")
+        
+        try:
+            import pytesseract
+            from PIL import Image
+        except ImportError as e:
+            raise RuntimeError(f"OCR dependencies not available: {e}. Install pytesseract and ensure Tesseract is installed.")
+        
+        try:
+            # Set TESSDATA_PREFIX environment variable for Tesseract
+            os.environ['TESSDATA_PREFIX'] = '/usr/share/tesseract-ocr/5/tessdata'
+            
+            # Open image
+            image = Image.open(image_path)
+            
+            # Extract text using Tesseract
+            text = pytesseract.image_to_string(image, lang=language)
+            
+            logger.info(f"OCR completed for {image_path}, extracted {len(text)} characters")
+            return text.strip()
+            
+        except Exception as e:
+            logger.error(f"Error performing OCR on {image_path}: {e}")
+            raise RuntimeError(f"OCR failed: {str(e)}")
+
 # Convenience functions for direct usage
 def convert_image_to_pdf(image_path: str, output_path: str = None, compress: str = None) -> dict:
     """Convert a single image to PDF"""
