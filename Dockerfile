@@ -19,8 +19,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt ./
 COPY *.py ./
 COPY profile.jpg ./
-# Copy environment file if it exists
-COPY .env ./
+# Environment variables will be passed via docker-compose.yml
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
