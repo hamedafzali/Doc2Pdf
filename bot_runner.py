@@ -29,6 +29,8 @@ def main():
     telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
     if not telegram_token:
         logger.error("TELEGRAM_BOT_TOKEN environment variable is required")
+        logger.error("Please set the token using: export TELEGRAM_BOT_TOKEN=your_token_here")
+        logger.error("Or create a .env file with the token")
         return
     
     # Import and run the refactored bot
