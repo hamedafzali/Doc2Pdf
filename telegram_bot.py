@@ -5,32 +5,34 @@ Clean, modular, and maintainable codebase
 """
 
 import os
-import tempfile
-import logging
 import asyncio
-from pathlib import Path
-from typing import List, Optional, Dict, Any
+import logging
+import tempfile
 from datetime import datetime
-from dataclasses import dataclass
+from typing import Optional, List
 from enum import Enum
+from dataclasses import dataclass
 
-from telegram import Update, BotCommand, BotCommandScopeChat
+from telegram import Update, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from telegram.constants import ParseMode
+from telegram.constants import ParseMode as ParseMode
 
 from image_converter import ImageToPdfConverter
-from document_converter import DocumentToPdfConverter
-from text_converter import TextToPdfConverter
 from pdf_tools import PdfTools
-from html_converter import HtmlToPdfConverter
+from message_templates import MessageTemplates
 
-# Configure logging
+# Setup logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
+def mask_token(token: str) -> str:
+    """Mask token for logging"""
+    if not token or len(token) < 10:
+        return token
+    return f"{token[:6]}...{token[-4:]}"
 
 class CompressionLevel(Enum):
     """Compression quality levels"""
@@ -374,10 +376,7 @@ class ImageToPdfBot:
     def __init__(self, token: str):
         self.token = token
         self.converter = ImageToPdfConverter()
-        self.doc_converter = DocumentToPdfConverter()
-        self.text_converter = TextToPdfConverter()
         self.pdf_tools = PdfTools()
-        self.html_converter = HtmlToPdfConverter()
         self.user_sessions: Dict[int, UserSession] = {}
         self.debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
         self.debug_dir = 'debug_output'
@@ -584,9 +583,9 @@ class ImageToPdfBot:
     async def url_to_pdf_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Convert a URL to PDF"""
         if not context.args:
-            await update.message.reply_text(MessageTemplates.url_usage())
+            await update.message.reply_text("📎 Please provide the URL to convert.\n\nExample: /url2pdf https://example.com")
             return
-
+        
         url = context.args[0]
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = os.path.join(temp_dir, "webpage.pdf")
@@ -719,11 +718,11 @@ class ImageToPdfBot:
                     caption=MessageTemplates.conversion_success(result, image_count),
                     parse_mode=ParseMode.MARKDOWN
                 ),
-                timeout=30.0  # 30 second timeout
+                timeout=60.0  # Increased to 60 seconds
             )
         except asyncio.TimeoutError:
             logger.error(f"Timeout sending PDF document: {result.pdf_path}")
-            await processing_message.edit_text("❌ Upload timed out. The PDF was created but sending failed. Please try again.")
+            await processing_message.edit_text("❌ Upload timed out. The PDF was created successfully and saved to debug output. Please check the debug directory.")
             return
         except Exception as e:
             logger.error(f"Error sending PDF document: {e}")
@@ -877,27 +876,26 @@ class ImageToPdfBot:
 
             try:
                 output_pdf = os.path.join(temp_dir, f"{Path(document.file_name).stem}.pdf")
-                if isinstance(converter, DocumentToPdfConverter):
-                    result = converter.convert_document(doc_path, output_pdf)
-                elif isinstance(converter, HtmlToPdfConverter):
-                    result = converter.convert_html_file(doc_path, output_pdf)
-                else:
-                    result = converter.convert_text(doc_path, output_pdf)
+                # Handle document conversion
+                result = self.pdf_tools.convert_document_to_pdf(doc_path, output_pdf)
+            except Exception as e:
+                logger.error(f"Error processing document: {e}")
+                await update.message.reply_text(f"❌ Error processing document: {str(e)}")
+                return
+            else:
                 original_size = self.converter.format_file_size(result["original_size"])
                 pdf_size = self.converter.format_file_size(result["pdf_size"])
-
+                
                 await update.message.reply_document(
                     document=open(result["pdf_path"], "rb"),
                     caption="✅ Document converted to PDF!",
                     parse_mode=ParseMode.MARKDOWN
                 )
+                
                 await update.message.reply_text(
                     MessageTemplates.document_success(original_size, pdf_size),
                     parse_mode=ParseMode.MARKDOWN
                 )
-            except Exception as e:
-                logger.error(f"Error converting document: {e}")
-                await update.message.reply_text(MessageTemplates.document_error(str(e)))
     
     def _get_image_info(self, image_path: str) -> Optional[ImageInfo]:
         """Get image information"""
@@ -932,8 +930,8 @@ class ImageToPdfBot:
         application.add_handler(CommandHandler("start", self.start))
         application.add_handler(CommandHandler("help", self.help_command))
         application.add_handler(CommandHandler("clear", self.clear_command))
-        application.add_handler(CommandHandler("convert", self.convert_command))
         application.add_handler(CommandHandler("convert_now", self.convert_now_command))
+        application.add_handler(CommandHandler("convertnow", self.convert_now_command))
         application.add_handler(CommandHandler("compress_high", self.set_compression_high))
         application.add_handler(CommandHandler("compresshigh", self.set_compression_high))  # Alias for compress_high
         application.add_handler(CommandHandler("compress_medium", self.set_compression_medium))
@@ -987,7 +985,7 @@ class ImageToPdfBot:
             # Profile picture is ready for manual upload
             logger.info("📸 Bot profile picture is ready!")
             logger.info(f"📁 Profile picture location: {profile_path}")
-            logger.info("� To set profile picture: Use @BotFather /setuserpic command")
+            logger.info("💡 To set profile picture: Use @BotFather /setuserpic command")
             logger.info("🔧 Bot profile picture setup completed (manual upload required)")
 
         except Exception as e:

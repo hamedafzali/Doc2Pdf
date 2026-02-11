@@ -60,15 +60,19 @@ class HtmlToPdfConverter:
     def convert_url(self, url: str, output_path: Optional[str] = None) -> dict:
         if output_path is None:
             output_path = "webpage.pdf"
-
+        
         output_path = os.path.abspath(output_path)
         self._ensure_wkhtmltopdf()
-
+        
+        # Validate and fix URL format
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        
         cmd = ["wkhtmltopdf", url, output_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "wkhtmltopdf failed")
-
+        
         return {
             "success": True,
             "pdf_path": output_path,
