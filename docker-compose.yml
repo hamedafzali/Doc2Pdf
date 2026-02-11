@@ -9,16 +9,11 @@ services:
       - PYTHONPATH=/app
       - LOG_LEVEL=INFO
       - DEBUG_MODE=true
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     volumes:
       - ./debug_output:/app/debug_output
     networks:
       - doc2pdf-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
 networks:
   doc2pdf-network:
