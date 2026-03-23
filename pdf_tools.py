@@ -1,5 +1,5 @@
 """
-PDF utilities: merge and split.
+PDF utilities: merge, compress, OCR, and split.
 """
 
 import os
@@ -12,6 +12,14 @@ from pypdf import PdfReader, PdfWriter
 
 class PdfTools:
     """Utility helpers for PDF operations."""
+
+    PDFSETTINGS = {
+        "screen": "/screen",
+        "ebook": "/ebook",
+        "printer": "/printer",
+        "prepress": "/prepress",
+        "default": "/default",
+    }
 
     def merge_pdfs(self, pdf_paths: List[str], output_path: Optional[str] = None) -> str:
         if not pdf_paths:
@@ -31,7 +39,7 @@ class PdfTools:
 
         return output_path
 
-    def compress_pdf(self, pdf_path: str, output_path: Optional[str] = None) -> str:
+    def compress_pdf(self, pdf_path: str, output_path: Optional[str] = None, profile: str = "ebook") -> str:
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
@@ -39,8 +47,28 @@ class PdfTools:
             base = os.path.splitext(os.path.basename(pdf_path))[0]
             output_path = f"{base}_compressed.pdf"
 
-        import pikepdf
+        gs_path = shutil.which("gs")
+        if gs_path:
+            gs_profile = self.PDFSETTINGS.get(profile, self.PDFSETTINGS["ebook"])
+            cmd = [
+                gs_path,
+                "-sDEVICE=pdfwrite",
+                "-dCompatibilityLevel=1.4",
+                "-dNOPAUSE",
+                "-dQUIET",
+                "-dBATCH",
+                f"-dPDFSETTINGS={gs_profile}",
+                "-dDetectDuplicateImages=true",
+                "-dCompressFonts=true",
+                "-dSubsetFonts=true",
+                f"-sOutputFile={output_path}",
+                pdf_path,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0 and os.path.exists(output_path):
+                return output_path
 
+        import pikepdf
         with pikepdf.open(pdf_path) as pdf:
             pdf.save(output_path, optimize_streams=True, compress_streams=True)
 

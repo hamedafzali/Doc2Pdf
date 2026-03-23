@@ -9,6 +9,7 @@ import asyncio
 import logging
 import tempfile
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List
 from enum import Enum
 from dataclasses import dataclass
@@ -565,13 +566,23 @@ class ImageToPdfBot:
             return
 
         source_pdf = session.pdf_files[-1]
+        profile = "ebook"
+        if context.args:
+            profile = context.args[0].lower()
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = os.path.join(temp_dir, "compressed.pdf")
             try:
-                compressed_path = self.pdf_tools.compress_pdf(source_pdf, output_path)
+                original_size = os.path.getsize(source_pdf)
+                compressed_path = self.pdf_tools.compress_pdf(source_pdf, output_path, profile=profile)
+                compressed_size = os.path.getsize(compressed_path)
                 await update.message.reply_document(
                     document=open(compressed_path, "rb"),
-                    caption="✅ PDF compressed successfully!",
+                    caption=(
+                        "✅ PDF compressed successfully!\n"
+                        f"Original: {self.converter.format_file_size(original_size)}\n"
+                        f"Compressed: {self.converter.format_file_size(compressed_size)}\n"
+                        f"Profile: {profile}"
+                    ),
                     parse_mode=ParseMode.MARKDOWN
                 )
             except Exception as e:

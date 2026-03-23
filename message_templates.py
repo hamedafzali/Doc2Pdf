@@ -52,11 +52,68 @@ class MessageTemplates:
     def files_cleared() -> str:
         """Files cleared message"""
         return "✅ All files cleared! Ready for new conversions."
+
+    @staticmethod
+    def pdf_received(file_name: str, pending_count: int) -> str:
+        """PDF received message"""
+        return (
+            f"✅ PDF received: {file_name}\n"
+            f"PDFs pending: {pending_count}\n"
+            "Use /compress_pdf, /merge, /split, or /ocr."
+        )
+
+    @staticmethod
+    def no_pdfs() -> str:
+        """No PDFs message"""
+        return "❌ No PDFs found. Please send a PDF first."
+
+    @staticmethod
+    def document_received(file_name: str) -> str:
+        """Document received message"""
+        return f"✅ Document received: {file_name}\nConverting to PDF..."
+
+    @staticmethod
+    def document_success(original_size: str, pdf_size: str) -> str:
+        """Document conversion success message"""
+        return (
+            "✅ Document converted to PDF!\n"
+            f"Original: {original_size}\n"
+            f"PDF: {pdf_size}"
+        )
+
+    @staticmethod
+    def document_error(error_message: str) -> str:
+        """Document conversion error message"""
+        return f"❌ Document conversion failed: {error_message}"
     
     @staticmethod
     def no_images() -> str:
         """No images message"""
         return "❌ No images found. Please send images first."
+
+    @staticmethod
+    def invalid_image() -> str:
+        """Invalid image message"""
+        return "❌ Invalid image format. Please send a valid image."
+
+    @staticmethod
+    def unsupported_format(file_extension: str, supported_formats) -> str:
+        """Unsupported format message"""
+        return (
+            f"❌ Unsupported format: {file_extension}\n"
+            f"Supported formats: {', '.join(sorted(supported_formats))}"
+        )
+
+    @staticmethod
+    def image_received(file_info, pending_count: int) -> str:
+        """Image received confirmation"""
+        return (
+            f"✅ Image received!\n"
+            f"Format: {file_info.format}\n"
+            f"Size: {file_info.size}\n"
+            f"Images pending: {pending_count}\n\n"
+            "Send more images or use /convert when ready."
+        )
     
     @staticmethod
     def processing_start(image_count: int, compression) -> str:
